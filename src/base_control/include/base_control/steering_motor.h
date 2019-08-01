@@ -17,9 +17,12 @@ class SteerMotor
 	void setSteeringSpeed(uint8_t speed);
 	void setSteeringRotate(float cycleNum);
 	void requestAdcValue(void);
-	uint16_t requestErrorMsg();
+	void requestEnableStatus();
+	void requestMotorSpeed();
+	void requestErrorMsg();
 	void disable();
 	void enable();
+	bool is_enabled(){return is_enabled_;}
 	void run(float rotate_angle, uint8_t rotate_speed=20);
 	const float &getRoadWheelAngle(){return road_wheel_angle_;}
 	const uint16_t getAdcValue(){return adcValue_;}
@@ -41,6 +44,9 @@ class SteerMotor
 	
 	float road_wheel_angle_resolution_;
 	float road_wheel_angle_offset_;
+	bool is_enabled_;
+	bool motor_speed_;
+	bool errorMsg_;
 };
 
 #endif
