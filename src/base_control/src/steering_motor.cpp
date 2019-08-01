@@ -1,7 +1,4 @@
 #include"base_control/steering_motor.h"
-#include<serial/serial.h>
-#include<boost/thread.hpp>
-
 
 static const uint16_t CRC16Table[]={
 0x0,    0xc0c1, 0xc181, 0x140,  0xc301, 0x3c0,  0x280,  0xc241, 0xc601, 0x6c0,  0x780,  0xc741, 0x500,  0xc5c1, 0xc481,
@@ -24,54 +21,25 @@ static const uint16_t CRC16Table[]={
 0x4040};
 
 
-
-
 #define MAX_LOAD_SIZE 100
-static char raw_buffer[MAX_LOAD_SIZE];
+static uint8_t raw_buffer[MAX_LOAD_SIZE];
 
 
-
-class SteerMotor
-{
-  public:
-	SteerMotor();
-	~SteerMotor();
-	bool init(std::string serial_port,int baud_rate);
-	void stopReadSerial();
-	void startReadSerial();
-	void setSteeringSpeed(uint8_t speed);
-	void setSteeringRotate(float cycleNum);
-	void requestAdcValue(void);
-	uint16_t requestErrorMsg();
-	void steeringDisable();
-	void steeringEnable();
-	void steerControl(float rotate_angle, uint8_t rotate_speed=20);
-	float &getRoadWheelAngle(){return angle_sensor_value_;}
-  private:
-	bool configure_port(std::string port,int baud_rate);
-	void readSerialPort();
-	uint16_t generateModBusCRC_byTable(const uint8_t *ptr,uint8_t size);
-	void BufferIncomingData(unsigned char *message, int length);
-	void sendCmd(const char* buf,int len);
-	
-	serial::Serial *serial_port_;
-	bool is_read_serial_;
-	boost::shared_ptr<boost::thread> read_serial_thread_ptr_;
-	
-	float angle_sensor_value_;
-}
 
 SteerMotor::SteerMotor()
 {
 	serial_port_ = NULL;
 	is_read_serial_ = false;
-	angle_sensor_value_ = 0.0;
+	road_wheel_angle_ = 0.0;
+	road_wheel_angle_resolution_ = 180.0/4096;
+	road_wheel_angle_offset_ = 0.0;
 }
 
 SteerMotor::~SteerMotor()
 {
 	if(serial_port_ != NULL)
 	{
+		serial_port_->close();
 		delete serial_port_;
 		serial_port_ = NULL;
 	}
@@ -138,7 +106,7 @@ void SteerMotor::readSerialPort()
 {
 	int len = 0;
 	// continuously read data from serial port
-	while (is_read_serial_ && ros::ok()) 
+	while (is_read_serial_) 
 	{
 		usleep(10000);
 		try
@@ -167,18 +135,18 @@ void SteerMotor::readSerialPort()
 	}
 }
 
-void SteerMotor::BufferIncomingData(unsigned char *message, int length)
+void SteerMotor::BufferIncomingData(uint8_t *message, int length)
 {
 	static int bufferIndex = 0;
-	static const MaxPkgLen = 10;
+	static const int MaxPkgLen = 10;
 	static int dataLength =0;
 	static int dataRemaind =0;
-	static char pkg_buffer[MaxPkgLen];
+	static uint8_t pkg_buffer[MaxPkgLen];
 	for(int i=0; i<length; ++i)
 	{	
 		if(bufferIndex>MaxPkgLen-1) //avoid out of range
 			bufferIndex = 0;
-		char data = message[i];
+		uint8_t data = message[i];
 		
 		if(0 == bufferIndex)
 		{
@@ -214,19 +182,17 @@ void SteerMotor::BufferIncomingData(unsigned char *message, int length)
 			{
 				if(2 == dataLength)
 				{
-					uint16_t adcValue = pkg_buffer[3]*256 + pkg_buffer[4];
-				
-					angle_sensor_value_ = 1.0 * (adcValue - g_AngleSensorAdValueOffset)*g_AngleSensorMaxAngle/g_AngleSensorMaxAdValue ;
+					adcValue_ = pkg_buffer[3]*256 + pkg_buffer[4];
+					road_wheel_angle_ = 1.0 * adcValue_ * road_wheel_angle_resolution_ + road_wheel_angle_offset_;
 				}
 			}
 			else
-				ROS_INFO("check failed ~");
+				printf("check failed ~");
 			
 			bufferIndex = 0;
 		}
 		else
 			pkg_buffer[bufferIndex++] = data;
-		
 	}
 }
 
@@ -241,18 +207,18 @@ void SteerMotor::setSteeringSpeed(uint8_t speed)
 		
 	steeringSpeedCmd[4] = speed >> 8;
 	steeringSpeedCmd[5] = speed & 0xff;
-	CRC_checkNum = generateModBusCRC_byTable(g_setSpeed_8bytesCmd,6);
+	CRC_checkNum = generateModBusCRC_byTable(steeringSpeedCmd,6);
 	steeringSpeedCmd[6] = CRC_checkNum &0xff;
 	steeringSpeedCmd[7] = CRC_checkNum >>8;
 	sendCmd(steeringSpeedCmd,8); 
 }
 
-void SteerMotor::sendCmd(const char* buf,int len)
+void SteerMotor::sendCmd(const uint8_t* buf,int len)
 {
 	serial_port_->write(buf,len);
 }
 
-void SteerMotor::steeringEnable()
+void SteerMotor::enable()
 {
 	//														0x01 //enable
 	//														0x00 //disable
@@ -260,10 +226,10 @@ void SteerMotor::steeringEnable()
 	sendCmd(steeringEnableCmd,11);
 }
 
-void SteerMotor::steeringDisable()
+void SteerMotor::disable()
 {
 	const uint8_t steeringDisableCmd[11]={0x01,0x10,0x00,0x33,0x00,0x01,0x02,0x00,0x00,0xA3,0x93};
-	sendControlCmd(disable_11bytesCmd,11);
+	sendCmd(steeringDisableCmd, 11);
 }
 
 void SteerMotor::setSteeringRotate(float cycleNum)
@@ -287,7 +253,7 @@ void SteerMotor::setSteeringRotate(float cycleNum)
 	sendCmd(steeringRotateCmd,13);
 }
 
-void SteerMotor::steerControl(float rotate_angle, uint8_t rotate_speed)
+void SteerMotor::run(float rotate_angle, uint8_t rotate_speed)
 {
 	//deg roadWheelAngle -> 1 cycle of steeringMotor
 	static const float degreePerCycle = 20.0;
