@@ -119,6 +119,7 @@ bool Recorder::recordPathService(interface::RecordPath::Request  &req,
 	{
 		fclose(fp_);
 		fp_ = NULL;
+		this->status_ = RecorderIdle;
 	}
 	
 	res.success = true;
