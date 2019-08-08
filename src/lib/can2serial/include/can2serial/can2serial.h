@@ -102,8 +102,6 @@ public:
 	
 	
 private:
-
-
 	void ReadSerialPort() ;
 
 	void BufferIncomingData(unsigned char *message, unsigned int length);

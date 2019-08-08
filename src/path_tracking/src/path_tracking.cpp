@@ -26,7 +26,7 @@ bool PathTracking::init(ros::NodeHandle nh,ros::NodeHandle nh_private)
 	
 	timer_ = nh.createTimer(ros::Duration(0.03),&PathTracking::timer_callback,this);
 	
-	pub_related_index_ = nh.advertise<std_msgs::UInt32>("/target_and_nearest_points_index",1);
+	pub_info_ = nh.advertise<driverless_msgs::PathTrachingInfo>("/path_tracking_info",1);
 	
 	nh_private.param<std::string>("path_points_file",path_points_file_,"");
 
@@ -107,10 +107,6 @@ void PathTracking::run()
 			target_point_ = path_points_[++target_point_index_];
 			continue;
 		}
-		
-		//publish the current target and nearest point index
-		this->publishRelatedIndex();
-		
 		float yaw_err = dis_yaw.second - current_point_.yaw;
 		
 		if(yaw_err==0.0) continue;
@@ -130,7 +126,7 @@ void PathTracking::run()
 			ROS_INFO("avoiding_offset_:%f\n",avoiding_offset_);
 		}
 		i++;
-		
+		this->publishInfo();
 		loop_rate.sleep();
 	}
 	
@@ -143,12 +139,14 @@ void PathTracking::run()
 }
 
 
-void PathTracking::publishRelatedIndex()
+void PathTracking::publishInfo()
 {
-	std_msgs::UInt32 msg;
-	msg.data = target_point_index_ << 16;
-	msg.data |= nearest_point_index_;
-	pub_related_index_.publish(msg);
+	info_.nearest_point_index = nearest_point_index_;
+	info_.target_point_index = target_point_index_;
+	info_.speed = current_speed_;
+	info_.lateral_err = lateral_err_;
+
+	pub_info_.publish(info_);
 }
 
 
@@ -163,6 +161,10 @@ void PathTracking::utm_callback(const gps_msgs::Utm::ConstPtr& msg)
 	current_point_.x = msg->x;
 	current_point_.y = msg->y;
 	current_point_.yaw = msg->yaw;
+	
+	float speed = msg->north_velocity * msg->north_velocity + msg->east_velocity * msg->east_velocity;
+	current_speed_ = sqrt(speed)*3.6; //km/h
+	
 	/*
 	tf::Quaternion quat;
 	tf::quaternionMsgToTF(msg->pose.pose.orientation, quat);

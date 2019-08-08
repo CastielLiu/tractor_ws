@@ -18,9 +18,14 @@ bool Interface::init()
 	ros::NodeHandle nh_private("~");
 	
 	sub_gps_ = nh.subscribe("/gps",1,&Interface::gps_callback,this);
-	sub_roadWheelAngle_ = 
-		nh.subscribe("/roadWheelAngle",1,&Interface::roadWheelAngle_callback,this);
+	//sub_roadWheelAngle_ = 
+	//	nh.subscribe("/roadWheelAngle",1,&Interface::roadWheelAngle_callback,this);
+	sub_pathtracking_info_ = 
+		nh.subscribe("/path_tracking_info",1,&Interface::path_tracking_info_callback, this);
+		
 	timer_ = nh.createTimer(ros::Duration(0.5), &Interface::timer_callback,this);
+	
+	client_recordPath_ = nh.serviceClient<interface::RecordPath>("record_path_service");
 	
 	nh_private.param<std::string>("can2serial_port",can2serial_port_,"");
 	nh_private.param<int>("can_baudrate",can_baudrate_,250);
@@ -59,9 +64,17 @@ void Interface::readCanMsg()
 			usleep(10000);
 			continue;
 		}
-		can2serial_->showCanMsg(can_msg);
-		//switch(can_msg.ID)
+		//can2serial_->showCanMsg(can_msg);
+		switch(can_msg.ID)
 		{
+			case RECORD_PATH_CAN_ID:
+				int file_seq = can_msg.data[0];
+				srv_record_path_.request.path_file_name = std::to_string(file_seq);
+				srv_record_path_.request.path_type = can_msg.data[2];
+				srv_record_path_.request.command_type = can_msg.data[3];
+				can_msg.data[7] = client_recordPath_.call(srv_record_path_);
+				can2serial_->sendCanMsg(can_msg); //response
+				break;
 			
 		}
 	}
@@ -69,8 +82,15 @@ void Interface::readCanMsg()
 
 void Interface::gps_callback(const gps_msgs::Inspvax::ConstPtr& gps)
 {
-	*(int *)(info_.gps.data) = gps->longitude * 100000;
-	*(int *)(info_.gps.data+4) = gps->latitude * 100000;
+	*(uint32_t *)(info_.gps.data) = uint32_t ((gps->longitude+210)*10000000);
+	*(uint32_t *)(info_.gps.data+4) = uint32_t ((gps->latitude+210)*10000000);
+	
+}
+
+void Interface::path_tracking_info_callback(const driverless_msgs::PathTrackingInfo::ConstPtr& info)
+{
+	*(uint16_t *)(info_.status.data) = uint16_t(info->speed *100);
+	*(uint16_t *)(info_.status.data+2) = uint16_t((info->lateral_err+3000)*10);
 }
 
 void Interface::roadWheelAngle_callback(const std_msgs::Float32 angle)

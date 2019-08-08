@@ -156,6 +156,12 @@ void gpsCallBack(const gps_msgs::Inspvax::ConstPtr& gps)
 	utm.y = northing;
 	utm.z = gps->height;
 	utm.yaw = gps->azimuth;
+	utm.roll = gps->roll;
+	utm.pitch = gps->pitch;
+	utm.north_velocity = gps->north_velocity;
+	utm.east_velocity = gps->east_velocity;
+	utm.up_velocity = gps->up_velocity;
+	
 	position_pub.publish(utm);
 }
 

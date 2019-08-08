@@ -1,6 +1,7 @@
 #ifndef PATH_TRACKING_H_
 #define PATH_TRACKING_H_
 
+#include<driverless_msgs/PathTrachingInfo.h>
 #include<driverless_msgs/ControlCmd.h>
 #include"path_tracking/function.h"
 #include<nav_msgs/Odometry.h> 
@@ -37,7 +38,7 @@ public:
 	void spinThread(){ros::spin();}
 
 private:
-	void publishRelatedIndex();
+	void publishInfo();
 	
 private:
 	
@@ -49,7 +50,7 @@ private:
 	
 	ros::Publisher pub_cmd_;
 	
-	ros::Publisher pub_related_index_;
+	ros::Publisher pub_info_;
 	
 	boost::shared_ptr<boost::thread> rosSpin_thread_ptr_;
 	
@@ -69,8 +70,10 @@ private:
 	float avoiding_offset_;
 	
 	driverless_msgs::ControlCmd cmd_;
+	driverless_msgs::PathTrachingInfo info_;
 	
 	float path_tracking_speed_;
+	float current_speed_;
 	
 	float current_roadwheelAngle_;
 	
