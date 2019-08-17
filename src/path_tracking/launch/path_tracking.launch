@@ -1,0 +1,10 @@
+<!-- -->
+<launch>
+	<node name="path_tracking" pkg="path_tracking" type="path_tracking">
+		<param name="path_file_dir" value="$(find record_path)/data"/>
+		<param name="foreSightDis_speedCoefficient" value="1.8"/>
+		<param name="foreSightDis_speedCoefficient" value="1.8"/>
+		<param name="min_foresight_distance" value="5.0"/>
+		<param name="wheel_base" value="1.5"/>
+	</node>
+</launch>

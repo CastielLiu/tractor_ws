@@ -79,21 +79,14 @@ bool Recorder::recordPathService(interface::RecordPath::Request  &req,
 {
 	if(req.command_type == req.START_RECORD_PATH )
 	{
+		ROS_INFO("START_RECORD_PATH");
 		if(this->status_ != RecorderIdle)
 		{
+			ROS_ERROR("status_ != RecorderIdle");
 			res.success = false;
 			return false;
 		}
-		//seq_type.txt
-		std::string path_file_name = file_path_ + req.path_file_name 
-			+"_"+std::to_string(req.path_type)+".txt";
-		fp_ = fopen(path_file_name.c_str(),"w");
-		if(fp_ == NULL)
-		{
-			ROS_ERROR("open %s failed!",path_file_name.c_str());
-			res.success = false;
-			return false;
-		}
+		
 		if(req.path_type ==req.CURVE_TYPE)
 			this->status_ = CurveRecording;
 		else if(req.path_type == req.VERTEX_TYPE)
@@ -104,9 +97,19 @@ bool Recorder::recordPathService(interface::RecordPath::Request  &req,
 			res.success = false;
 			return false;
 		}
+	
+		ROS_INFO("path_file_name: %s",req.path_file_name.c_str());
+		fp_ = fopen(req.path_file_name.c_str(),"w");
+		if(fp_ == NULL)
+		{
+			ROS_ERROR("open %s failed!",req.path_file_name.c_str());
+			res.success = false;
+			return false;
+		}
 	}
 	else if(req.command_type == req.RECORD_CURRENT_POINT)
 	{
+		ROS_INFO("RECORD_CURRENT_POINT");
 		if(this->status_ != VertexRecording)
 		{
 			res.success = false;
@@ -117,6 +120,12 @@ bool Recorder::recordPathService(interface::RecordPath::Request  &req,
 	}
 	else if(req.command_type == req.STOP_RECORD_PATH)
 	{
+		ROS_INFO("RECORD_complete");
+		if(this->status_ == RecorderIdle)
+		{
+			res.success = false;
+			return false;
+		}
 		fclose(fp_);
 		fp_ = NULL;
 		this->status_ = RecorderIdle;
@@ -124,7 +133,6 @@ bool Recorder::recordPathService(interface::RecordPath::Request  &req,
 	
 	res.success = true;
 	return true;
-	
 }
 
 
@@ -132,7 +140,6 @@ float Recorder::calculate_dis2(gpsMsg_t & point1,gpsMsg_t& point2)
 {
 	float x = point1.x - point2.x;
 	float y = point1.y - point2.y;
-	
 	return x*x+y*y;
 }
 

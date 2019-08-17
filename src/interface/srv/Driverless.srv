@@ -1,0 +1,20 @@
+
+uint8  command_type
+uint8  START = 1
+uint8  STOP = 2
+uint8  SUSPEND = 3
+
+string path_file_name
+uint8  path_type
+uint8  VERTEX_TYPE=100
+uint8  CURVE_TYPE =101
+
+float32 speed
+---
+
+uint8  success
+uint8  FILE_NOT_EXISTS = 1
+uint8  PATH_TYPE_ERROR = 2
+uint8  CMD_TYPE_ERROR = 3
+uint8  FAILED = 10
+uint8  OK = 255

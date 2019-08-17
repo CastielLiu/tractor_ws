@@ -26,6 +26,7 @@ bool Interface::init()
 	timer_ = nh.createTimer(ros::Duration(0.5), &Interface::timer_callback,this);
 	
 	client_recordPath_ = nh.serviceClient<interface::RecordPath>("record_path_service");
+	client_driverless_ = nh.serviceClient<interface::Driverless>("driverless_service");
 	
 	nh_private.param<std::string>("can2serial_port",can2serial_port_,"");
 	nh_private.param<int>("can_baudrate",can_baudrate_,250);
@@ -68,14 +69,24 @@ void Interface::readCanMsg()
 		switch(can_msg.ID)
 		{
 			case RECORD_PATH_CAN_ID:
-				int file_seq = can_msg.data[0];
-				srv_record_path_.request.path_file_name = std::to_string(file_seq);
+				//int file_seq = can_msg.data[0];
 				srv_record_path_.request.path_type = can_msg.data[2];
+				// seq_type.txt
+				srv_record_path_.request.path_file_name = std::to_string(can_msg.data[0])+"_"+ std::to_string(srv_record_path_.request.path_type)+".txt";
 				srv_record_path_.request.command_type = can_msg.data[3];
+				ROS_INFO("requestRecodPath:%s\ttype:%d\tcmd:%d",srv_record_path_.request.path_file_name.c_str(),srv_record_path_.request.path_type,srv_record_path_.request.command_type);
 				can_msg.data[7] = client_recordPath_.call(srv_record_path_);
 				can2serial_->sendCanMsg(can_msg); //response
 				break;
-			
+			case DRIVERLESS_CAN_ID:
+				srv_driverless_.request.command_type = can_msg.data[0];
+				srv_driverless_.request.path_type = can_msg.data[1];
+				//int file_seq = can_msg.data[2];
+				// seq_type.txt
+				srv_driverless_.request.path_file_name = std::to_string(can_msg.data[2]) +"_"+ std::to_string(srv_driverless_.request.path_type)+".txt";
+				can_msg.data[7] = client_driverless_.call(srv_driverless_);
+				can2serial_->sendCanMsg(can_msg); //response
+				break;
 		}
 	}
 }

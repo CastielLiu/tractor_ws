@@ -9,6 +9,7 @@
 #include<gps_msgs/Inspvax.h>
 #include<driverless_msgs/PathTrackingInfo.h>
 #include<interface/RecordPath.h>
+#include<interface/Driverless.h>
 
 
 class Interface
@@ -30,6 +31,8 @@ class Interface
 		GPS_CAN_ID = 0x500,
 		STATUS_CAN_ID = 0x501,
 		RECORD_PATH_CAN_ID = 0x502,
+		DRIVERLESS_CAN_ID = 0x503,
+		
 	};
 
 	struct Informathion
@@ -55,6 +58,9 @@ class Interface
 	boost::shared_ptr<boost::thread> read_canMsg_thread_;
 	ros::ServiceClient client_recordPath_;
 	interface::RecordPath srv_record_path_;
+	
+	ros::ServiceClient client_driverless_;
+	interface::Driverless srv_driverless_;
 };
 
 

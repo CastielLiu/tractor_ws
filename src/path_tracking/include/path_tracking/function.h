@@ -21,6 +21,7 @@ typedef struct
 	float maxOffset_right;
 }gpsMsg_t;
 
+
 float calculateDis2path(const double& X_,const double& Y_,
 						 const std::vector<gpsMsg_t>& path_points, 
 						 const size_t& target_point_index,
@@ -148,7 +149,7 @@ bool is_gps_data_valid(gpsMsg_t& point)
 	return false;
 }
 
-float dis2Points(const gpsMsg_t& point1, const gpsMsg_t& point2,bool is_sqrt=false)
+float dis2Points(const gpsMsg_t& point1, const gpsMsg_t& point2,bool is_sqrt)
 {
 	float x = point1.x - point2.x;
 	float y = point1.y - point2.y;
@@ -180,7 +181,7 @@ size_t findNearestPoint(const std::vector<gpsMsg_t>& path_points, const gpsMsg_t
 	
 	for(size_t i=0; i<path_points.size(); )
 	{
-		dis = dis2Points(path_points[i],current_point);
+		dis = dis2Points(path_points[i],current_point,true);
 		//ROS_INFO("i=%d\t dis:%f",i,dis);
 		//ROS_INFO("path_points[%d] x:%lf\t y:%lf",i,path_points[i].x,path_points[i].y);
 		//ROS_INFO("current_point  x:%lf\t y:%lf",current_point.x,current_point.y);
@@ -189,25 +190,10 @@ size_t findNearestPoint(const std::vector<gpsMsg_t>& path_points, const gpsMsg_t
 			min_dis = dis;
 			index = i;
 		}
-		if(dis>1000)
-			i += 1000;
-		else if(dis > 500)
-			i += 500;
-		else if(dis > 250)
-			i += 250;
-		else if(dis > 125)
-			i += 125;
-		else if(dis > 63)
-			i += 63;
-		else if(dis > 42)
-			i += 42;
-		else if(dis > 21)
-			i += 21;
-		else
-			i += 1;
+		i += int(dis);
 	}
 	
-	if(min_dis >20.0)
+	if(min_dis >10.0)
 		throw("nearest point is over range!");
 	
 	return index;
@@ -228,6 +214,7 @@ float generateRoadwheelAngleByRadius(const float& radius, const float& wheel_bas
 
 bool loadPathPoints(std::string file_path,std::vector<gpsMsg_t>& points)
 {
+	
 	FILE *fp = fopen(file_path.c_str(),"r");
 	
 	if(fp==NULL)
@@ -244,10 +231,34 @@ bool loadPathPoints(std::string file_path,std::vector<gpsMsg_t>& points)
 		points.push_back(point);
 	}
 	fclose(fp);
-	
 	return true;
 }
 
+bool generatePathByVertexes(const std::vector<gpsMsg_t>& vertexes,std::vector<gpsMsg_t>& pathPoints,float increment)
+{
+	if(vertexes.size()<2)
+		return false;
+	gpsMsg_t startPoint = vertexes[0];
+	gpsMsg_t endPoint;
+	for(int i=1; i<vertexes.size(); ++i)
+	{
+		endPoint = vertexes[i];
+		float distance = dis2Points(startPoint,endPoint,true);
+		int point_cnt = distance / increment;
+		
+		double x_increment = (endPoint.x - startPoint.x)/point_cnt;
+		double y_increment = (endPoint.y - startPoint.y)/point_cnt;
+		
+		for(int j=0; j<point_cnt; ++j)
+		{
+			gpsMsg_t now;
+			now.x = startPoint.x + x_increment*j;
+			now.y = startPoint.y + y_increment*j;
+			pathPoints.push_back(now);
+		}
+	}
+	return true;
+}
 
 
 #endif

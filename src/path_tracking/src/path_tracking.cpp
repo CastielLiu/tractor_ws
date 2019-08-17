@@ -6,7 +6,9 @@ PathTracking::PathTracking():
 	nearest_point_index_(0),
 	avoiding_offset_(0.0),
 	max_roadwheelAngle_(25.0),
-	is_avoiding_(false)
+	is_avoiding_(false),
+	status_(Idle),
+	thread_ptr_(NULL)
 {
 	cmd_.set_speed =0.0;
 	cmd_.set_roadWheelAngle =0.0;
@@ -14,6 +16,11 @@ PathTracking::PathTracking():
 
 PathTracking::~PathTracking()
 {
+	if(thread_ptr_ != NULL)
+	{
+		delete thread_ptr_ ;
+		thread_ptr_ = NULL;
+	}
 }
 
 bool PathTracking::init(ros::NodeHandle nh,ros::NodeHandle nh_private)
@@ -28,9 +35,17 @@ bool PathTracking::init(ros::NodeHandle nh,ros::NodeHandle nh_private)
 	
 	pub_info_ = nh.advertise<driverless_msgs::PathTrachingInfo>("/path_tracking_info",1);
 	
-	nh_private.param<std::string>("path_points_file",path_points_file_,"");
+	srv_driverless_ = nh.advertiseService("driverless_service",&PathTracking::driverlessService,this);
+	
+	nh_private.param<std::string>("path_file_dir",path_file_dir_,"");
+	
+	if(path_file_dir_.empty())
+	{
+		ROS_ERROR("no input path file directory !!!");
+		return false;
+	}
 
-	nh_private.param<float>("speed",path_tracking_speed_,3.0);
+	nh_private.param<float>("max_speed",max_speed_,20.0);//km/h
 
 	nh_private.param<float>("foreSightDis_speedCoefficient", foreSightDis_speedCoefficient_,1.8);
 	nh_private.param<float>("foreSightDis_latErrCoefficient", foreSightDis_latErrCoefficient_,0.3);
@@ -38,17 +53,79 @@ bool PathTracking::init(ros::NodeHandle nh,ros::NodeHandle nh_private)
 	nh_private.param<float>("min_foresight_distance",min_foresight_distance_,5.0);
 	nh_private.param<float>("wheel_base", wheel_base_, 1.5);
 	
-	if(path_points_file_.empty())
-	{
-		ROS_ERROR("no input path points file !!");
-		return false;
-	}
-	
 	//start the ros::spin() thread
 	rosSpin_thread_ptr_ = boost::shared_ptr<boost::thread >(new boost::thread(boost::bind(&PathTracking::spinThread, this)));
 	
-	if(!loadPathPoints(path_points_file_, path_points_))
+	
+	while(ros::ok() && !is_gps_data_valid(current_point_))
+	{
+		ROS_INFO("gps data is invalid, please check the gps topic or waiting...");
+		sleep(1);
+	}
+	
+	return true;
+}
+
+bool PathTracking::driverlessService(interface::Driverless::Request  &req,
+									 interface::Driverless::Response &res)
+{
+	if(req.command_type == req.START)
+	{
+		if(this->status_ != Idle)
+		{
+			res.success = res.FAILED;
+			return false;
+		}
+		fs::path file = fs::path(path_file_dir_)/req.path_file_name;
+		if(!fs::exists(file))
+		{
+			res.success = res.FILE_NOT_EXISTS;
+			return false;
+		}
+		if(req.path_type == req.CURVE_TYPE)
+			this->status_ = CurveTracking;
+		else if(req.path_type == req.VERTEX_TYPE)
+			this->status_ = VertexTracking;
+		else
+		{
+			res.success = res.PATH_TYPE_ERROR;
+			return false;
+		}
+		thread_ptr_ = new boost::thread(&PathTracking::pathTrackingThread,this,file,req.speed);
+		delete thread_ptr_;
+		thread_ptr_ = NULL;
+	}
+	else if(req.command_type == req.START)
+		this->status_ = Idle;
+	else if(req.command_type == req.SUSPEND)
+		this->status_ = Suspend;
+	else
+	{
+		res.success = res.CMD_TYPE_ERROR;
 		return false;
+	}
+	
+	res.success = res.OK;
+	return true;
+}
+
+void PathTracking::pathTrackingThread(const fs::path& file, float speed)
+{
+	if(speed > max_speed_)
+		speed = max_speed_;
+		
+	std::string file_name = fs::system_complete(file).string();
+	if(status_ == CurveTracking)
+	{
+		path_points_.clear();
+		loadPathPoints(file_name, path_points_);
+	}
+	else if(status_ == VertexTracking)
+	{
+		std::vector<gpsMsg_t> vertexes;
+		loadPathPoints(file_name,vertexes);
+		generatePathByVertexes(vertexes,path_points_,0.1);
+	}
 	
 	ROS_INFO("pathPoints size:%lu",path_points_.size());
 	
@@ -57,33 +134,23 @@ bool PathTracking::init(ros::NodeHandle nh,ros::NodeHandle nh_private)
 	  std::cout <<path_points_[i].x <<"\t " <<path_points_[i].y <<std::endl;
 	}*/
 	
-	while(ros::ok() && !is_gps_data_valid(current_point_))
-	{
-		ROS_INFO("gps data is invalid, please check the gps topic or waiting...");
-		sleep(1);
-	}
-	
 	target_point_index_ = findNearestPoint(path_points_,current_point_);
 	
 	if(target_point_index_ > path_points_.size() - 10)
 	{
 		ROS_ERROR("target index:%lu ?? file read over, No target point was found !!!",target_point_index_);
-		return false;
+		this->status_ = Idle;
+		return ;
 	}
 	
 	target_point_ = path_points_[target_point_index_];
-	return true;
-}
-
-
-
-void PathTracking::run()
-{
-	size_t i =0;
 	
 	ros::Rate loop_rate(30);
 	
-	while(ros::ok() && target_point_index_ < path_points_.size()-2)
+	int cnt = 0;
+	
+	while(status_ > Suspend && ros::ok() &&
+		  target_point_index_ < path_points_.size()-2)
 	{
 		if( avoiding_offset_ != 0.0)
 			pointOffset(target_point_,avoiding_offset_);
@@ -115,27 +182,33 @@ void PathTracking::run()
 
 		float t_roadWheelAngle = generateRoadwheelAngleByRadius(turning_radius, wheel_base_);
 		
-		cmd_.set_speed = path_tracking_speed_;
+		cmd_.set_speed = speed;
 		
 		cmd_.set_roadWheelAngle = t_roadWheelAngle;
 		
-		if(i%20==0)
+		if(cnt%20==0)
 		{
 			ROS_INFO("dis2target:%.2f\t yaw_err:%.2f\t lat_err:%.2f",dis_yaw.first,yaw_err*180.0/M_PI,lateral_err_);
 			ROS_INFO("disThreshold:%f\t expect roadwheel angle:%.2f",disThreshold_,t_roadWheelAngle);
 			ROS_INFO("avoiding_offset_:%f\n",avoiding_offset_);
 		}
-		i++;
+		++cnt;
 		this->publishInfo();
 		loop_rate.sleep();
 	}
-	
+
 	ROS_INFO("driverless completed...");
-	
-	cmd_.set_roadWheelAngle = 0.0;
-	cmd_.set_speed = 0.0;
-	
-	sleep(5);
+
+	this->status_ = Idle;
+	//thread over stop the vehicle
+	cmd_.set_speed =0.0;
+	cmd_.set_roadWheelAngle =0.0;
+}
+
+
+void PathTracking::run()
+{
+	rosSpin_thread_ptr_->join();
 }
 
 
@@ -152,6 +225,11 @@ void PathTracking::publishInfo()
 
 void PathTracking::timer_callback(const ros::TimerEvent&)
 {
+	if(this->status_ == Idle)
+		return;
+	if(this->status_ == Suspend)
+		cmd_.set_speed  = 0.0;
+	
 	pub_cmd_.publish(cmd_);
 }
 
@@ -164,15 +242,6 @@ void PathTracking::utm_callback(const gps_msgs::Utm::ConstPtr& msg)
 	
 	float speed = msg->north_velocity * msg->north_velocity + msg->east_velocity * msg->east_velocity;
 	current_speed_ = sqrt(speed)*3.6; //km/h
-	
-	/*
-	tf::Quaternion quat;
-	tf::quaternionMsgToTF(msg->pose.pose.orientation, quat);
-	
-	double roll,pitch;
-	
-	tf::Matrix3x3(quat).getRPY(roll, pitch, current_point_.yaw);
-*/
 }
 
 void PathTracking::avoiding_flag_callback(const std_msgs::Float32::ConstPtr& msg)
@@ -180,7 +249,6 @@ void PathTracking::avoiding_flag_callback(const std_msgs::Float32::ConstPtr& msg
 	//avoid to left(-) or right(+) the value presents the offset
 	avoiding_offset_ = msg->data;
 }
-
 
 int main(int argc,char**argv)
 {

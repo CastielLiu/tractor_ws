@@ -1,10 +1,11 @@
 #ifndef PATH_TRACKING_H_
 #define PATH_TRACKING_H_
 
+#include<boost/filesystem.hpp>
 #include<driverless_msgs/PathTrachingInfo.h>
+#include<interface/Driverless.h>
 #include<driverless_msgs/ControlCmd.h>
 #include"path_tracking/function.h"
-#include<nav_msgs/Odometry.h> 
 #include<std_msgs/Float32.h>
 #include<std_msgs/Float32.h>
 #include<boost/thread.hpp>
@@ -18,8 +19,7 @@
 #include<climits>
 #include <thread>
 #include<vector>
-
-
+namespace fs = boost::filesystem;
 
 class PathTracking
 {
@@ -39,7 +39,9 @@ public:
 
 private:
 	void publishInfo();
-	
+	bool driverlessService(interface::Driverless::Request  &req,
+									 interface::Driverless::Response &res);
+	void pathTrackingThread(const fs::path& file, float speed);
 private:
 	
 	ros::Subscriber sub_utm_;
@@ -52,9 +54,11 @@ private:
 	
 	ros::Publisher pub_info_;
 	
+	ros::ServiceServer srv_driverless_;
+	
 	boost::shared_ptr<boost::thread> rosSpin_thread_ptr_;
 	
-	std::string path_points_file_;
+	std::string path_file_dir_;
 	
 	std::vector<gpsMsg_t> path_points_;
 	
@@ -72,7 +76,7 @@ private:
 	driverless_msgs::ControlCmd cmd_;
 	driverless_msgs::PathTrachingInfo info_;
 	
-	float path_tracking_speed_;
+	float max_speed_;
 	float current_speed_;
 	
 	float current_roadwheelAngle_;
@@ -86,6 +90,17 @@ private:
 	float foreSightDis_speedCoefficient_;
 	float foreSightDis_latErrCoefficient_;
 	float wheel_base_;
+	
+	enum status_t
+	{
+		Idle = 0,
+		Suspend = 1,
+		VertexTracking = 2,
+		CurveTracking = 3,
+		
+	}status_;
+	
+	boost::thread * thread_ptr_;
 	
 };
 
