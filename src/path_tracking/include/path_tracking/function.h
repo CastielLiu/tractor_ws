@@ -182,15 +182,15 @@ size_t findNearestPoint(const std::vector<gpsMsg_t>& path_points, const gpsMsg_t
 	for(size_t i=0; i<path_points.size(); )
 	{
 		dis = dis2Points(path_points[i],current_point,true);
-		//ROS_INFO("i=%d\t dis:%f",i,dis);
-		//ROS_INFO("path_points[%d] x:%lf\t y:%lf",i,path_points[i].x,path_points[i].y);
-		//ROS_INFO("current_point  x:%lf\t y:%lf",current_point.x,current_point.y);
+		printf("i=%d\t dis:%f\n",i,dis);
+		printf("path_points[%d] x:%lf\t y:%lf\n",i,path_points[i].x,path_points[i].y);
+		printf("current_point  x:%lf\t y:%lf\n",current_point.x,current_point.y);
 		if(dis < min_dis)
 		{
 			min_dis = dis;
 			index = i;
 		}
-		i += int(dis);
+		i += int(dis)+1;
 	}
 	
 	if(min_dis >10.0)

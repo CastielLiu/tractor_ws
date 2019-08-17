@@ -75,7 +75,8 @@ void Interface::readCanMsg()
 				srv_record_path_.request.path_file_name = std::to_string(can_msg.data[0])+"_"+ std::to_string(srv_record_path_.request.path_type)+".txt";
 				srv_record_path_.request.command_type = can_msg.data[3];
 				ROS_INFO("requestRecodPath:%s\ttype:%d\tcmd:%d",srv_record_path_.request.path_file_name.c_str(),srv_record_path_.request.path_type,srv_record_path_.request.command_type);
-				can_msg.data[7] = client_recordPath_.call(srv_record_path_);
+				client_recordPath_.call(srv_record_path_);
+				can_msg.data[7] = srv_record_path_.response.success;
 				can2serial_->sendCanMsg(can_msg); //response
 				break;
 			case DRIVERLESS_CAN_ID:
@@ -84,7 +85,8 @@ void Interface::readCanMsg()
 				//int file_seq = can_msg.data[2];
 				// seq_type.txt
 				srv_driverless_.request.path_file_name = std::to_string(can_msg.data[2]) +"_"+ std::to_string(srv_driverless_.request.path_type)+".txt";
-				can_msg.data[7] = client_driverless_.call(srv_driverless_);
+				client_driverless_.call(srv_driverless_);
+				can_msg.data[7] = srv_driverless_.response.success;
 				can2serial_->sendCanMsg(can_msg); //response
 				break;
 		}

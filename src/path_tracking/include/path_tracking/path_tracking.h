@@ -91,6 +91,8 @@ private:
 	float foreSightDis_latErrCoefficient_;
 	float wheel_base_;
 	
+	bool is_gpsOk_;
+	
 	enum status_t
 	{
 		Idle = 0,

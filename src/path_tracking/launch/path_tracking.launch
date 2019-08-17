@@ -1,6 +1,6 @@
 <!-- -->
 <launch>
-	<node name="path_tracking" pkg="path_tracking" type="path_tracking">
+	<node name="path_tracking" pkg="path_tracking" type="path_tracking_node" output="screen">
 		<param name="path_file_dir" value="$(find record_path)/data"/>
 		<param name="foreSightDis_speedCoefficient" value="1.8"/>
 		<param name="foreSightDis_speedCoefficient" value="1.8"/>

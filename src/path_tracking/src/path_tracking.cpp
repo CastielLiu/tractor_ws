@@ -8,7 +8,8 @@ PathTracking::PathTracking():
 	max_roadwheelAngle_(25.0),
 	is_avoiding_(false),
 	status_(Idle),
-	thread_ptr_(NULL)
+	thread_ptr_(NULL),
+	is_gpsOk_(false)
 {
 	cmd_.set_speed =0.0;
 	cmd_.set_roadWheelAngle =0.0;
@@ -25,7 +26,7 @@ PathTracking::~PathTracking()
 
 bool PathTracking::init(ros::NodeHandle nh,ros::NodeHandle nh_private)
 {
-	sub_utm_ = nh.subscribe("/utm_gps",1,&PathTracking::utm_callback,this);
+	sub_utm_ = nh.subscribe("/gps_utm",1,&PathTracking::utm_callback,this);
 
 	sub_avoiding_from_lidar_ = nh.subscribe("/start_avoiding",1,&PathTracking::avoiding_flag_callback,this);
 	
@@ -57,7 +58,7 @@ bool PathTracking::init(ros::NodeHandle nh,ros::NodeHandle nh_private)
 	rosSpin_thread_ptr_ = boost::shared_ptr<boost::thread >(new boost::thread(boost::bind(&PathTracking::spinThread, this)));
 	
 	
-	while(ros::ok() && !is_gps_data_valid(current_point_))
+	while(ros::ok() && !is_gpsOk_)
 	{
 		ROS_INFO("gps data is invalid, please check the gps topic or waiting...");
 		sleep(1);
@@ -80,7 +81,7 @@ bool PathTracking::driverlessService(interface::Driverless::Request  &req,
 		if(!fs::exists(file))
 		{
 			res.success = res.FILE_NOT_EXISTS;
-			return false;
+			return true;
 		}
 		if(req.path_type == req.CURVE_TYPE)
 			this->status_ = CurveTracking;
@@ -135,6 +136,8 @@ void PathTracking::pathTrackingThread(const fs::path& file, float speed)
 	}*/
 	
 	target_point_index_ = findNearestPoint(path_points_,current_point_);
+	
+	ROS_INFO("target_point_index_: %lu",target_point_index_);
 	
 	if(target_point_index_ > path_points_.size() - 10)
 	{
@@ -236,6 +239,8 @@ void PathTracking::timer_callback(const ros::TimerEvent&)
 
 void PathTracking::utm_callback(const gps_msgs::Utm::ConstPtr& msg)
 {
+	is_gpsOk_ = true;
+	
 	current_point_.x = msg->x;
 	current_point_.y = msg->y;
 	current_point_.yaw = msg->yaw;
