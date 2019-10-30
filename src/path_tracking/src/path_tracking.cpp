@@ -120,7 +120,7 @@ void PathTracking::pathTrackingThread(const fs::path& file, float speed)
 		generatePathByVertexes(vertexes,path_points_,0.1);
 	}
 	
-	ROS_INFO("pathPoints size:%lu",path_points_.size());
+	ROS_INFO("path points size:%lu",path_points_.size());
 	
 	/*for(size_t i=0; i< path_points_.size();i++ )
 	{
@@ -233,7 +233,6 @@ void PathTracking::timer_callback(const ros::TimerEvent&)
 	
 	pub_cmd_.publish(cmd_);
 }
-
 
 void PathTracking::odom_callback(const nav_msgs::Odometry::ConstPtr& msg)
 {

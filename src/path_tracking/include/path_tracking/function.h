@@ -11,12 +11,9 @@ typedef struct
 	double longitude;
 	double latitude;
 	double yaw;
-	
 	double x;
 	double y;
-	
 	float curvature;
-	
 	float maxOffset_left;
 	float maxOffset_right;
 }gpsMsg_t;
