@@ -8,12 +8,11 @@
 #include"path_tracking/function.h"
 #include<std_msgs/Float32.h>
 #include<std_msgs/Float32.h>
+#include<nav_msgs/Odometry.h> 
 #include<boost/thread.hpp>
 #include<std_msgs/UInt32.h>
 #include<std_msgs/UInt8.h>
 #include<std_msgs/Bool.h>
-#include<gps_msgs/Inspvax.h>
-#include<gps_msgs/Utm.h>
 #include<boost/bind.hpp>
 #include<ros/ros.h>
 #include<climits>
@@ -31,7 +30,7 @@ public:
 	
 	void timer_callback(const ros::TimerEvent&);
 	
-	void utm_callback(const gps_msgs::Utm::ConstPtr& msg);
+	void odom_callback(const nav_msgs::Odometry::ConstPtr& msg);
 	
 	void avoiding_flag_callback(const std_msgs::Float32::ConstPtr& msg);
 
@@ -57,6 +56,7 @@ private:
 	ros::ServiceServer srv_driverless_;
 	
 	boost::shared_ptr<boost::thread> rosSpin_thread_ptr_;
+	boost::shared_ptr<boost::thread> tracking_thread_ptr_;
 	
 	std::string path_file_dir_;
 	
@@ -91,8 +91,6 @@ private:
 	float foreSightDis_latErrCoefficient_;
 	float wheel_base_;
 	
-	bool is_gpsOk_;
-	
 	enum status_t
 	{
 		Idle = 0,
@@ -101,8 +99,6 @@ private:
 		CurveTracking = 3,
 		
 	}status_;
-	
-	boost::thread * thread_ptr_;
 	
 };
 

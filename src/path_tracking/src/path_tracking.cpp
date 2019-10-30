@@ -7,9 +7,7 @@ PathTracking::PathTracking():
 	avoiding_offset_(0.0),
 	max_roadwheelAngle_(25.0),
 	is_avoiding_(false),
-	status_(Idle),
-	thread_ptr_(NULL),
-	is_gpsOk_(false)
+	status_(Idle)
 {
 	cmd_.set_speed =0.0;
 	cmd_.set_roadWheelAngle =0.0;
@@ -17,16 +15,11 @@ PathTracking::PathTracking():
 
 PathTracking::~PathTracking()
 {
-	if(thread_ptr_ != NULL)
-	{
-		delete thread_ptr_ ;
-		thread_ptr_ = NULL;
-	}
 }
 
 bool PathTracking::init(ros::NodeHandle nh,ros::NodeHandle nh_private)
 {
-	sub_utm_ = nh.subscribe("/gps_utm",1,&PathTracking::utm_callback,this);
+	sub_utm_ = nh.subscribe("/ll2utm",1,&PathTracking::odom_callback,this);
 
 	sub_avoiding_from_lidar_ = nh.subscribe("/start_avoiding",1,&PathTracking::avoiding_flag_callback,this);
 	
@@ -58,7 +51,7 @@ bool PathTracking::init(ros::NodeHandle nh,ros::NodeHandle nh_private)
 	rosSpin_thread_ptr_ = boost::shared_ptr<boost::thread >(new boost::thread(boost::bind(&PathTracking::spinThread, this)));
 	
 	
-	while(ros::ok() && !is_gpsOk_)
+	while(ros::ok() && !is_gps_data_valid(current_point_))
 	{
 		ROS_INFO("gps data is invalid, please check the gps topic or waiting...");
 		sleep(1);
@@ -75,7 +68,7 @@ bool PathTracking::driverlessService(interface::Driverless::Request  &req,
 		if(this->status_ != Idle)
 		{
 			res.success = res.FAILED;
-			return false;
+			return true;
 		}
 		fs::path file = fs::path(path_file_dir_)/req.path_file_name;
 		if(!fs::exists(file))
@@ -90,20 +83,19 @@ bool PathTracking::driverlessService(interface::Driverless::Request  &req,
 		else
 		{
 			res.success = res.PATH_TYPE_ERROR;
-			return false;
+			return true;
 		}
-		thread_ptr_ = new boost::thread(&PathTracking::pathTrackingThread,this,file,req.speed);
-		delete thread_ptr_;
-		thread_ptr_ = NULL;
+		
+		tracking_thread_ptr_ = boost::shared_ptr<boost::thread >(new boost::thread(boost::bind(&PathTracking::pathTrackingThread, this,file,req.speed)));
 	}
-	else if(req.command_type == req.START)
+	else if(req.command_type == req.STOP)
 		this->status_ = Idle;
 	else if(req.command_type == req.SUSPEND)
 		this->status_ = Suspend;
 	else
 	{
 		res.success = res.CMD_TYPE_ERROR;
-		return false;
+		return true;
 	}
 	
 	res.success = res.OK;
@@ -152,11 +144,16 @@ void PathTracking::pathTrackingThread(const fs::path& file, float speed)
 	
 	int cnt = 0;
 	
-	while(status_ > Suspend && ros::ok() &&
-		  target_point_index_ < path_points_.size()-2)
+	while(ros::ok() && target_point_index_ < path_points_.size()-2)
 	{
+		if(status_ == Suspend)
+			continue;
+		else if(status_ == Idle)
+			break;
+			
+		
 		if( avoiding_offset_ != 0.0)
-			pointOffset(target_point_,avoiding_offset_);
+			target_point_ = pointOffset(target_point_,avoiding_offset_);
 		
 		try
 		{
@@ -212,6 +209,7 @@ void PathTracking::pathTrackingThread(const fs::path& file, float speed)
 void PathTracking::run()
 {
 	rosSpin_thread_ptr_->join();
+	tracking_thread_ptr_->join();
 }
 
 
@@ -237,16 +235,17 @@ void PathTracking::timer_callback(const ros::TimerEvent&)
 }
 
 
-void PathTracking::utm_callback(const gps_msgs::Utm::ConstPtr& msg)
+void PathTracking::odom_callback(const nav_msgs::Odometry::ConstPtr& msg)
 {
-	is_gpsOk_ = true;
+	current_point_.x = msg->pose.pose.position.x;
+	current_point_.y = msg->pose.pose.position.y;
+	current_point_.yaw = msg->pose.covariance[0];
 	
-	current_point_.x = msg->x;
-	current_point_.y = msg->y;
-	current_point_.yaw = msg->yaw;
+	current_point_.longitude = msg->pose.covariance[1];
+	current_point_.latitude = msg->pose.covariance[2];
 	
-	float speed = msg->north_velocity * msg->north_velocity + msg->east_velocity * msg->east_velocity;
-	current_speed_ = sqrt(speed)*3.6; //km/h
+//	float speed = msg->north_velocity * msg->north_velocity + msg->east_velocity * msg->east_velocity;
+//	current_speed_ = sqrt(speed)*3.6; //km/h
 }
 
 void PathTracking::avoiding_flag_callback(const std_msgs::Float32::ConstPtr& msg)

@@ -144,7 +144,7 @@ float calculateDis2path(const double& X_,const double& Y_,
 
 bool is_gps_data_valid(gpsMsg_t& point)
 {
-	if(point.x !=0 && point.y !=0)
+	if(fabs(point.x) >100 && fabs(point.y) >100)
 		return true;
 	return false;
 }
@@ -199,10 +199,12 @@ size_t findNearestPoint(const std::vector<gpsMsg_t>& path_points, const gpsMsg_t
 	return index;
 }
 
-void pointOffset(gpsMsg_t& point,float offset)
+gpsMsg_t pointOffset(const gpsMsg_t& point,float offset)
 {
-	point.x =  offset * cos(point.yaw) + point.x;
-	point.y = -offset * sin(point.yaw) + point.y;
+	gpsMsg_t result = point;
+	result.x =  offset * cos(point.yaw) + point.x;
+	result.y = -offset * sin(point.yaw) + point.y;
+	return result;
 }
 
 float generateRoadwheelAngleByRadius(const float& radius, const float& wheel_base)
