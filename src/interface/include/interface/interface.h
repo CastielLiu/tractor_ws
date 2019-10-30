@@ -28,7 +28,7 @@ class Interface
   	void path_tracking_info_callback(const driverless_msgs::PathTrackingInfo::ConstPtr& );
   	enum 
 	{
-		GPS_CAN_ID = 0x500,
+		GPS_CAN_ID = 0x301,
 		STATUS_CAN_ID = 0x501,
 		RECORD_PATH_CAN_ID = 0x502,
 		DRIVERLESS_CAN_ID = 0x503,

@@ -3,7 +3,7 @@
 
 	<node name="interface_node" pkg="interface" type="interface_node" output="screen">
 		<param name="can2serial_port" value="/dev/ttyUSB0"/>
-		<param name="can_baudrate" value="500"/>
+		<param name="can_baudrate" value="250"/>
 	</node>
 
 
