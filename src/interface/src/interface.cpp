@@ -107,15 +107,15 @@ void Interface::odom_callback(const nav_msgs::Odometry::ConstPtr& msg)
 	double yaw = msg->pose.covariance[0] *180.0/M_PI;
 	double longitude = msg->pose.covariance[1];
 	double latitude = msg->pose.covariance[2];
-	uint16_t height = msg->pose.pose.position.z * 10 - 2000;
+	uint16_t height = msg->pose.pose.position.z * 10 + 2000;
 
 	*(uint32_t *)(info_.gps.data) = uint32_t (longitude*10000000);
 	*(uint32_t *)(info_.gps.data+4) = uint32_t (latitude*10000000);
 	
 	*(uint16_t *)(info_.status.data) = uint16_t(yaw*10);
 	info_.status.data[2] = 10 << 3;  //satellite_num << 3
-	info_.status.data[2] |= 1; // none differentiation positioning
-	*(uint16_t *)(info_.status.data+5) = height;
+	info_.status.data[2] |= 0x01; // none differentiation positioning
+	*(uint16_t *)(info_.status.data+6) = height;
 }
 
 void Interface::path_tracking_info_callback(const driverless_msgs::PathTrackingInfo::ConstPtr& info)
@@ -124,7 +124,8 @@ void Interface::path_tracking_info_callback(const driverless_msgs::PathTrackingI
 	info_.status.data[3] = speed%256;
 	info_.status.data[4] = speed/256;
 	
-	uint16_t lateral_err = uint16_t(info->lateral_err) - 255;
+	uint16_t lateral_err = uint16_t(info->lateral_err*100) + 255;
+	ROS_INFO("%d",lateral_err);
 	info_.status.data[4] |= lateral_err%2 << 7;
 	info_.status.data[5] = lateral_err/2;
 }
@@ -133,8 +134,11 @@ void Interface::path_tracking_info_callback(const driverless_msgs::PathTrackingI
 void Interface::timer_callback(const ros::TimerEvent& event)
 {
 	can2serial_->sendCanMsg(info_.gps);
+	can2serial_->showCanMsg(info_.gps);
+	
 	usleep(1000);
 	can2serial_->sendCanMsg(info_.status);
+	can2serial_->showCanMsg(info_.status);
 }
 
 int main(int argc,char** argv)
