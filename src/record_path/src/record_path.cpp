@@ -2,7 +2,7 @@
 #include "gps_msgs/Inspvax.h"
 #include <unistd.h>
 #include<cmath>
-#include<gps_msgs/Utm.h>
+#include<nav_msgs/Odometry.h>
 #include<interface/RecordPath.h>
 #include<path_tracking/function.h>
 
@@ -24,9 +24,9 @@ public:
 private:
 	bool recordPathService(interface::RecordPath::Request  &req,
 						   interface::RecordPath::Response &res);
-	void utm_gps_callback(const gps_msgs::Utm::ConstPtr& msg);
+	void odom_callback(const nav_msgs::Odometry::ConstPtr& msg);
 	float calculate_dis2(gpsMsg_t & point1,gpsMsg_t& point2);
-	
+	bool is_location_ok();
 	std::string file_path_;
 	
 	FILE *fp_;
@@ -68,7 +68,7 @@ bool Recorder::init()
 	
 	srv_record_path_ = nh.advertiseService("record_path_service",&Recorder::recordPathService,this);
 	
-	sub_utm_ = nh.subscribe("/gps_utm",1,&Recorder::utm_gps_callback,this);
+	sub_utm_ = nh.subscribe("/ll2utm",1,&Recorder::odom_callback,this);
 
 
 	return true;
@@ -77,55 +77,63 @@ bool Recorder::init()
 bool Recorder::recordPathService(interface::RecordPath::Request  &req,
 								 interface::RecordPath::Response &res)
 {
+	if(!is_location_ok())
+	{
+		ROS_ERROR("Location status is abnormal, unable to record path");
+		res.success = false;
+		return false;
+	}
 	if(req.command_type == req.START_RECORD_PATH )
 	{
-		ROS_INFO("START_RECORD_PATH");
 		if(this->status_ != RecorderIdle)
 		{
-			ROS_ERROR("status_ != RecorderIdle");
+			ROS_ERROR("Recording in progress, instruction invalid!");
 			res.success = false;
 			return false;
 		}
-		
+		ROS_INFO("command: START_RECORD_PATH");
 		if(req.path_type ==req.CURVE_TYPE)
 			this->status_ = CurveRecording;
 		else if(req.path_type == req.VERTEX_TYPE)
 			this->status_ = VertexRecording;
 		else
 		{
-			ROS_INFO("path type error !");
+			ROS_ERROR("Expected path type error !");
 			res.success = false;
 			return false;
 		}
-	
-		ROS_INFO("path_file_name: %s",req.path_file_name.c_str());
-		fp_ = fopen(req.path_file_name.c_str(),"w");
+		
+		std::string file = file_path_ + req.path_file_name;
+		
+		fp_ = fopen(file.c_str(),"w");
 		if(fp_ == NULL)
 		{
-			ROS_ERROR("open %s failed!",req.path_file_name.c_str());
+			ROS_ERROR("open %s failed!",file.c_str());
 			res.success = false;
 			return false;
 		}
+		else
+			ROS_INFO("New file: %s created.",file.c_str());
 	}
 	else if(req.command_type == req.RECORD_CURRENT_POINT)
 	{
-		ROS_INFO("RECORD_CURRENT_POINT");
 		if(this->status_ != VertexRecording)
 		{
 			res.success = false;
 			return false;
 		}
+		ROS_INFO("RECORD_CURRENT_POINT: %.3f\t%.3f\t%.3f",current_point.x,current_point.y,current_point.yaw);
 		fprintf(fp_,"%.3f\t%.3f\t%.3f\r\n",current_point.x,current_point.y,current_point.yaw);
 		fflush(fp_);
 	}
 	else if(req.command_type == req.STOP_RECORD_PATH)
 	{
-		ROS_INFO("RECORD_complete");
 		if(this->status_ == RecorderIdle)
 		{
 			res.success = false;
 			return false;
 		}
+		ROS_INFO("RECORD_complete");
 		fclose(fp_);
 		fp_ = NULL;
 		this->status_ = RecorderIdle;
@@ -143,21 +151,29 @@ float Recorder::calculate_dis2(gpsMsg_t & point1,gpsMsg_t& point2)
 	return x*x+y*y;
 }
 
-void Recorder::utm_gps_callback(const gps_msgs::Utm::ConstPtr& msg)
+bool Recorder::is_location_ok()
+{
+	if(fabs(current_point.x) < 1.0 && fabs(current_point.y) < 1.0)
+		return false;
+	return true;
+}
+
+
+void Recorder::odom_callback(const nav_msgs::Odometry::ConstPtr& msg)
 {
 	if(this->status_ == RecorderIdle)
 		return ;
 	
-	current_point.x = msg->x;
-	current_point.y = msg->y;
-	current_point.yaw = msg->yaw;
+	current_point.x = msg->pose.pose.position.x;
+	current_point.y = msg->pose.pose.position.y;
+	current_point.yaw = msg->pose.covariance[0];
 	
 	if(this->status_ != CurveRecording)
 		return;
 	
 	if(sample_distance_*sample_distance_ <= calculate_dis2(current_point,last_point))
 	{
-		//x,y,theta,offset_l,offset_r,traffic_sign
+		printf("recoding: %.3f\t%.3f\t%.3f\r\n",current_point.x,current_point.y,current_point.yaw);
 		fprintf(fp_,"%.3f\t%.3f\t%.3f\r\n",current_point.x,current_point.y,current_point.yaw);
 		fflush(fp_);
 

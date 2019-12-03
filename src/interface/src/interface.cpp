@@ -2,7 +2,9 @@
 #include<interface/interface.h>
 
 
-Interface::Interface()
+Interface::Interface():
+	odom_flag_(false),
+	tracking_info_flag_(false)
 {
 	can2serial_ = new Can2serial;
 }
@@ -77,7 +79,7 @@ void Interface::readCanMsg()
 				srv_record_path_.request.path_type = can_msg.data[2];
 				srv_record_path_.request.path_file_name = std::to_string(file_seq)+"_"+ std::to_string(srv_record_path_.request.path_type)+".txt";
 				srv_record_path_.request.command_type = can_msg.data[3];
-				ROS_INFO("requestRecodPath:%s\ttype:%d\tcmd:%d",srv_record_path_.request.path_file_name.c_str(),srv_record_path_.request.path_type,srv_record_path_.request.command_type);
+				ROS_INFO("requestRecodPath: %s\ttype:%d\tcmd:%d",srv_record_path_.request.path_file_name.c_str(),srv_record_path_.request.path_type,srv_record_path_.request.command_type);
 				client_recordPath_.call(srv_record_path_);
 				can_msg_response.data[0] = 0x00;//response path tracking
 				can_msg_response.data[1] = srv_record_path_.response.success;
@@ -108,6 +110,11 @@ void Interface::odom_callback(const nav_msgs::Odometry::ConstPtr& msg)
 	double longitude = msg->pose.covariance[1];
 	double latitude = msg->pose.covariance[2];
 	uint16_t height = msg->pose.pose.position.z * 10 + 2000;
+	
+	if(longitude > 0 && latitude >0 )
+		odom_flag_ = true;
+	else
+		odom_flag_ = false;
 
 	*(uint32_t *)(info_.gps.data) = uint32_t (longitude*10000000);
 	*(uint32_t *)(info_.gps.data+4) = uint32_t (latitude*10000000);
@@ -120,12 +127,13 @@ void Interface::odom_callback(const nav_msgs::Odometry::ConstPtr& msg)
 
 void Interface::path_tracking_info_callback(const driverless_msgs::PathTrackingInfo::ConstPtr& info)
 {
+	tracking_info_flag_ = true;
 	uint16_t speed = uint16_t(info->speed *10);
 	info_.status.data[3] = speed%256;
 	info_.status.data[4] = speed/256;
 	
 	uint16_t lateral_err = uint16_t(info->lateral_err*100) + 255;
-	ROS_INFO("%d",lateral_err);
+//	ROS_INFO("lateral_err:%d",lateral_err);
 	info_.status.data[4] |= lateral_err%2 << 7;
 	info_.status.data[5] = lateral_err/2;
 }
@@ -133,12 +141,19 @@ void Interface::path_tracking_info_callback(const driverless_msgs::PathTrackingI
 
 void Interface::timer_callback(const ros::TimerEvent& event)
 {
-	can2serial_->sendCanMsg(info_.gps);
-	can2serial_->showCanMsg(info_.gps);
+	if(odom_flag_)
+	{
+		can2serial_->sendCanMsg(info_.gps);
+//		can2serial_->showCanMsg(info_.gps);
+		usleep(1000);
+	}
+	if(tracking_info_flag_)
+	{
+		can2serial_->sendCanMsg(info_.status);
+//		can2serial_->showCanMsg(info_.status);
+	}
 	
-	usleep(1000);
-	can2serial_->sendCanMsg(info_.status);
-	can2serial_->showCanMsg(info_.status);
+	
 }
 
 int main(int argc,char** argv)

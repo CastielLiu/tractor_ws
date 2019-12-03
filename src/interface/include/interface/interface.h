@@ -1,15 +1,15 @@
 #ifndef INTERFCE_H_
 #define INTERFCE_H_
 
-#include<can2serial/can2serial.h>
-#include<std_msgs/Float32.h>
-#include<string>
-#include<nav_msgs/Odometry.h>
+#include <can2serial/can2serial.h>
+#include <std_msgs/Float32.h>
+#include <string>
+#include <nav_msgs/Odometry.h>
 #include <boost/thread.hpp>
 #include <boost/bind.hpp>
-#include<driverless_msgs/PathTrackingInfo.h>
-#include<interface/RecordPath.h>
-#include<interface/Driverless.h>
+#include <driverless_msgs/PathTrackingInfo.h>
+#include <interface/RecordPath.h>
+#include <interface/Driverless.h>
 
 
 class Interface
@@ -45,6 +45,8 @@ class Interface
 	std::string can2serial_port_;
 	int can_baudrate_;
 	Informathion info_;
+	
+	bool odom_flag_, tracking_info_flag_;
 	
 	ros::Subscriber sub_gps_;
 	ros::Subscriber sub_pathtracking_info_;
