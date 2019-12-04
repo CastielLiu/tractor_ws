@@ -6,13 +6,13 @@ add_compile_options(-std=c++11)
 
 
 find_package(catkin REQUIRED COMPONENTS
-  can2serial
-  driverless_msgs
-  gps_msgs
-  roscpp
-  std_msgs
-  gps_msgs
-  message_generation
+	can2serial
+	driverless_msgs
+	gps_msgs
+	roscpp
+	std_msgs
+	gps_msgs
+	message_generation
 )
 
 add_service_files(

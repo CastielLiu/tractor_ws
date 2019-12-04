@@ -1,0 +1,3 @@
+[submodule "src/can2serial"]
+	path = src/can2serial
+	url = https://github.com/CastielLiu/can2serial.git
