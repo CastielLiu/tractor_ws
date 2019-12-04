@@ -27,7 +27,7 @@ bool PathTracking::init(ros::NodeHandle nh,ros::NodeHandle nh_private)
 	
 	timer_ = nh.createTimer(ros::Duration(0.03),&PathTracking::timer_callback,this);
 	
-	pub_info_ = nh.advertise<driverless_msgs::PathTrachingInfo>("/path_tracking_info",1);
+	pub_info_ = nh.advertise<driverless_msgs::PathTrackingInfo>("/path_tracking_info",1);
 	
 	srv_driverless_ = nh.advertiseService("driverless_service",&PathTracking::driverlessService,this);
 	
@@ -44,7 +44,7 @@ bool PathTracking::init(ros::NodeHandle nh,ros::NodeHandle nh_private)
 	nh_private.param<float>("foreSightDis_speedCoefficient", foreSightDis_speedCoefficient_,1.8);
 	nh_private.param<float>("foreSightDis_latErrCoefficient", foreSightDis_latErrCoefficient_,0.3);
 	
-	nh_private.param<float>("min_foresight_distance",min_foresight_distance_,5.0);
+	nh_private.param<float>("min_foresight_distance",min_foresight_distance_,4.0);
 	nh_private.param<float>("wheel_base", wheel_base_, 1.5);
 	
 	//start the ros::spin() thread
@@ -133,7 +133,7 @@ void PathTracking::pathTrackingThread(const fs::path& file, float speed)
 	
 	if(target_point_index_ > path_points_.size() - 10)
 	{
-		ROS_ERROR("target index:%lu ?? file read over, No target point was found !!!",target_point_index_);
+		ROS_INFO("target index:%lu,  file read over, No target point was found !!!",target_point_index_);
 		this->status_ = Idle;
 		return ;
 	}
@@ -165,7 +165,7 @@ void PathTracking::pathTrackingThread(const fs::path& file, float speed)
 			break;
 		}
 		
-		disThreshold_ = foreSightDis_latErrCoefficient_ * fabs(lateral_err_) + min_foresight_distance_;
+		disThreshold_ = foreSightDis_latErrCoefficient_ * fabs(lateral_err_) + min_foresight_distance_;//??????
 									 
 		std::pair<float, float> dis_yaw = get_dis_yaw(target_point_, current_point_);
 
@@ -197,7 +197,7 @@ void PathTracking::pathTrackingThread(const fs::path& file, float speed)
 		loop_rate.sleep();
 	}
 
-	ROS_INFO("driverless completed...");
+	ROS_INFO("driverless completed..."); //send msg to screen ??????/
 
 	this->status_ = Idle;
 	//thread over stop the vehicle

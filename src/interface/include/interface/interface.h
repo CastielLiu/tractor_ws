@@ -15,17 +15,17 @@
 class Interface
 {
   public:
-  	Interface();
-  	~Interface();
-  	bool init();
-  	void run();
-  	
+	Interface();
+	~Interface();
+	bool init();
+	void run();
+	
   private:
-  	void readCanMsg();
-  	void odom_callback(const nav_msgs::Odometry::ConstPtr& gps);
-  	void timer_callback(const ros::TimerEvent& event);
-  	void path_tracking_info_callback(const driverless_msgs::PathTrackingInfo::ConstPtr& );
-  	enum 
+	void readCanMsg();
+	void odom_callback(const nav_msgs::Odometry::ConstPtr& gps);
+	void timer_callback(const ros::TimerEvent& event);
+	void path_tracking_info_callback(const driverless_msgs::PathTrackingInfo::ConstPtr& );
+	enum 
 	{
 		GPS_CAN_ID = 0x301,
 		STATUS_CAN_ID = 0x302,
@@ -33,11 +33,14 @@ class Interface
 		DRIVERLESS_CAN_ID = 0x201,
 		RESPONSE_CAN_ID = 0x205,
 	};
-
 	struct Informathion
 	{
-		CanMsg_t gps = {GPS_CAN_ID,8,Can2serial::STD_DATA_FRAME};
-		CanMsg_t status = {STATUS_CAN_ID,8,Can2serial::STD_DATA_FRAME};
+		Informathion()
+		{
+			gps.ID = GPS_CAN_ID;
+			status.ID = STATUS_CAN_ID;
+		}
+		CanMsg_t gps, status;
 	};
 	
   private:

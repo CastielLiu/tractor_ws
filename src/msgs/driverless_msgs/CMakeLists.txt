@@ -6,10 +6,10 @@ project(driverless_msgs)
 
 
 find_package(catkin REQUIRED COMPONENTS
+  message_generation
   roscpp
   rospy
   std_msgs
-  message_generation
 )
 
 add_message_files(
@@ -24,9 +24,11 @@ generate_messages(
 )
 
 catkin_package(
-    CATKIN_DEPENDS message_runtime std_msgs
+    CATKIN_DEPENDS 
+    message_runtime 
 )
 
-include_directories(include
+include_directories(
+  include
   ${catkin_INCLUDE_DIRS}
 )

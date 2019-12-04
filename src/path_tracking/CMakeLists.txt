@@ -6,10 +6,10 @@ add_compile_options(-std=c++11)
 
 
 find_package(catkin REQUIRED COMPONENTS
+  driverless_msgs
   roscpp
   rospy
   std_msgs
-  driverless_msgs
   serial
 )
 
@@ -26,7 +26,6 @@ catkin_package(
 include_directories(
   include
   ${catkin_INCLUDE_DIRS}
-  
 )
 
 add_executable(path_tracking_node src/path_tracking.cpp)

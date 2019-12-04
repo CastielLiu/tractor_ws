@@ -15,7 +15,7 @@ find_package(catkin REQUIRED COMPONENTS
 catkin_package(
 #  INCLUDE_DIRS include
 #  LIBRARIES base_control
-  CATKIN_DEPENDS roscpp serial std_msgs driverless_msgs 
+#  CATKIN_DEPENDS roscpp serial std_msgs driverless_msgs 
 #  DEPENDS system_lib
 )
 
@@ -28,5 +28,5 @@ include_directories(
 aux_source_directory(src/. SRC)
 add_executable(${PROJECT_NAME}_node ${SRC})
 target_link_libraries(${PROJECT_NAME}_node ${catkin_LIBRARIES})
-
+add_dependencies(${PROJECT_NAME}_node ${${PROJECT_NAME}_EXPORTED_TARGETS} ${catkin_EXPORTED_TARGETS})
 

@@ -38,6 +38,7 @@ include_directories(
 
 add_executable(${PROJECT_NAME}_node src/interface.cpp)
 target_link_libraries(${PROJECT_NAME}_node ${catkin_LIBRARIES})
+add_dependencies(${PROJECT_NAME}_node ${${PROJECT_NAME}_EXPORTED_TARGETS} ${catkin_EXPORTED_TARGETS})
 
 
 

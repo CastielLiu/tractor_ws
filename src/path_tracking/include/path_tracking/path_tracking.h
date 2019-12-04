@@ -2,7 +2,7 @@
 #define PATH_TRACKING_H_
 
 #include<boost/filesystem.hpp>
-#include<driverless_msgs/PathTrachingInfo.h>
+#include<driverless_msgs/PathTrackingInfo.h>
 #include<interface/Driverless.h>
 #include<driverless_msgs/ControlCmd.h>
 #include"path_tracking/function.h"
@@ -74,7 +74,7 @@ private:
 	float avoiding_offset_;
 	
 	driverless_msgs::ControlCmd cmd_;
-	driverless_msgs::PathTrachingInfo info_;
+	driverless_msgs::PathTrackingInfo info_;
 	
 	float max_speed_;
 	float current_speed_;
