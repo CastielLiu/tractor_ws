@@ -55,7 +55,7 @@ bool BaseControl::init()
 	
 	if(!steerMotor_.init(steerMotor_port_name_,115200))
 		return false;
-	steerMotor_.enable();
+	steerMotor_.enable(); //?
 	steerMotor_.startReadSerial();
 	
 	sub_cmd_ = nh.subscribe("/cmd",1,&BaseControl::cmd_callback,this);
@@ -64,6 +64,20 @@ bool BaseControl::init()
 
 void BaseControl::cmd_callback(const driverless_msgs::ControlCmd::ConstPtr& msg)
 {
+	if(!msg->driverless_mode)
+	{
+		if(steerMotor_.is_enabled())
+			steerMotor_.disable();
+		return;
+	}
+	if(!steerMotor_.is_enabled())
+			steerMotor_.enable();
+	
+	if(msg->set_brake > 0)
+	{
+		//stop;
+		ROS_INFO("stop!!!");
+	}
 	steerMotor_.run(msg->set_roadWheelAngle);
 }
 

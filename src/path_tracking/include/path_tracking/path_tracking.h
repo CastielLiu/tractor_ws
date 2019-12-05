@@ -95,6 +95,7 @@ private:
 	{
 		Idle = 0,
 		Suspend = 1,
+		Stop = 4,
 		VertexTracking = 2,
 		CurveTracking = 3,
 		

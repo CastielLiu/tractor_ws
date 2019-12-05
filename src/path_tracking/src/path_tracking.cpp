@@ -89,7 +89,7 @@ bool PathTracking::driverlessService(interface::Driverless::Request  &req,
 		tracking_thread_ptr_ = boost::shared_ptr<boost::thread >(new boost::thread(boost::bind(&PathTracking::pathTrackingThread, this,file,req.speed)));
 	}
 	else if(req.command_type == req.STOP)
-		this->status_ = Idle;
+		this->status_ = Stop;
 	else if(req.command_type == req.SUSPEND)
 		this->status_ = Suspend;
 	else
@@ -199,12 +199,9 @@ void PathTracking::pathTrackingThread(const fs::path& file, float speed)
 
 	ROS_INFO("driverless completed..."); //send msg to screen ??????/
 
-	this->status_ = Idle;
-	//thread over stop the vehicle
-	cmd_.set_speed =0.0;
-	cmd_.set_roadWheelAngle =0.0;
-}
+	this->status_ = Stop;
 
+}
 
 void PathTracking::run()
 {
@@ -227,10 +224,36 @@ void PathTracking::publishInfo()
 void PathTracking::timer_callback(const ros::TimerEvent&)
 {
 	if(this->status_ == Idle)
-		return;
-	if(this->status_ == Suspend)
-		cmd_.set_speed  = 0.0;
-	
+	{
+		cmd_.driverless_mode = false;
+	}
+	else if(this->status_ == Suspend)
+	{
+		cmd_.driverless_mode = true;
+		cmd_.set_brake = 1;
+	}
+	else if(this->status_ == Stop)
+	{
+		static bool is_first = false;
+		static ros::Time first_time;
+		if(!is_first)
+		{
+			is_first = true;
+			first_time = ros::Time::now();
+		}
+		else if((ros::Time::now() - first_time).toSec() > 10.0)
+		{
+			this->status_ = Idle;
+			is_first = false;
+		}
+		cmd_.driverless_mode = true;
+		cmd_.set_brake = 1;
+	}
+	else
+	{
+		cmd_.driverless_mode = true;
+		cmd_.set_brake = 0;
+	}
 	pub_cmd_.publish(cmd_);
 }
 
