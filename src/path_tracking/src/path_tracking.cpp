@@ -53,7 +53,7 @@ bool PathTracking::init(ros::NodeHandle nh,ros::NodeHandle nh_private)
 	
 	while(ros::ok() && !is_gps_data_valid(current_point_))
 	{
-		ROS_INFO("gps data is invalid, please check the gps topic or waiting...");
+		ROS_INFO("[Path Tracking]: gps data is invalid, please check the gps topic or waiting...");
 		sleep(1);
 	}
 	

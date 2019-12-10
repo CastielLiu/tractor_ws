@@ -13,6 +13,12 @@
 #define CurveRecording 2
 #define VertexRecording 3
 
+
+/*recod path response*/
+#define Success 0
+#define Fail    1
+
+
 class Recorder
 {
 public:
@@ -79,16 +85,16 @@ bool Recorder::recordPathService(interface::RecordPath::Request  &req,
 	if(!is_location_ok())
 	{
 		ROS_ERROR("Location status is abnormal, unable to record path");
-		res.success = false;
-		return false;
+		res.success = Fail;
+		return true;
 	}
 	if(req.command_type == req.START_RECORD_PATH )
 	{
 		if(this->status_ != RecorderIdle)
 		{
 			ROS_ERROR("Recording in progress, instruction invalid!");
-			res.success = false;
-			return false;
+			res.success = Fail;
+			return true;
 		}
 		ROS_INFO("command: START_RECORD_PATH");
 		if(req.path_type ==req.CURVE_TYPE)
@@ -98,8 +104,8 @@ bool Recorder::recordPathService(interface::RecordPath::Request  &req,
 		else
 		{
 			ROS_ERROR("Expected path type error !");
-			res.success = false;
-			return false;
+			res.success = Fail;
+			return true;
 		}
 		
 		std::string file = file_path_ + req.path_file_name;
@@ -108,8 +114,8 @@ bool Recorder::recordPathService(interface::RecordPath::Request  &req,
 		if(fp_ == NULL)
 		{
 			ROS_ERROR("open %s failed!",file.c_str());
-			res.success = false;
-			return false;
+			res.success = Fail;
+			return true;
 		}
 		else
 			ROS_INFO("New file: %s created.",file.c_str());
@@ -118,8 +124,16 @@ bool Recorder::recordPathService(interface::RecordPath::Request  &req,
 	{
 		if(this->status_ != VertexRecording)
 		{
-			res.success = false;
-			return false;
+			res.success = Fail;
+			return true;
+		}
+		static gpsMsg_t _last_point;
+		float dis = dis2Points(current_point, _last_point, true);
+		
+		if(dis < 1.0)
+		{
+			res.success = Fail;
+			return true;
 		}
 		ROS_INFO("RECORD_CURRENT_POINT: %.3f\t%.3f\t%.3f",current_point.x,current_point.y,current_point.yaw);
 		fprintf(fp_,"%.3f\t%.3f\t%.3f\r\n",current_point.x,current_point.y,current_point.yaw);
@@ -129,8 +143,8 @@ bool Recorder::recordPathService(interface::RecordPath::Request  &req,
 	{
 		if(this->status_ == RecorderIdle)
 		{
-			res.success = false;
-			return false;
+			res.success = Fail;
+			return true;
 		}
 		ROS_INFO("RECORD_complete");
 		fclose(fp_);
@@ -138,7 +152,7 @@ bool Recorder::recordPathService(interface::RecordPath::Request  &req,
 		this->status_ = RecorderIdle;
 	}
 	
-	res.success = true;
+	res.success = Success;
 	return true;
 }
 
@@ -160,9 +174,6 @@ bool Recorder::is_location_ok()
 
 void Recorder::odom_callback(const nav_msgs::Odometry::ConstPtr& msg)
 {
-	if(this->status_ == RecorderIdle)
-		return ;
-	
 	current_point.x = msg->pose.pose.position.x;
 	current_point.y = msg->pose.pose.position.y;
 	current_point.yaw = msg->pose.covariance[0];

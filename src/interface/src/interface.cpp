@@ -79,9 +79,9 @@ void Interface::readCanMsg()
 				srv_record_path_.request.path_type = can_msg.data[2];
 				srv_record_path_.request.path_file_name = std::to_string(file_seq)+"_"+ std::to_string(srv_record_path_.request.path_type)+".txt";
 				srv_record_path_.request.command_type = can_msg.data[3];
-				ROS_INFO("requestRecodPath: %s\ttype:%d\tcmd:%d",srv_record_path_.request.path_file_name.c_str(),srv_record_path_.request.path_type,srv_record_path_.request.command_type);
+				ROS_INFO("request recod path: %s\ttype:%d\tcmd:%d",srv_record_path_.request.path_file_name.c_str(),srv_record_path_.request.path_type,srv_record_path_.request.command_type);
 				client_recordPath_.call(srv_record_path_);
-				can_msg_response.data[0] = 0x00;//response path tracking
+				can_msg_response.data[0] = 0x00;//response record path
 				can_msg_response.data[1] = srv_record_path_.response.success;
 				can2serial_->sendCanMsg(can_msg_response); //response
 				break;
@@ -147,13 +147,15 @@ void Interface::timer_callback(const ros::TimerEvent& event)
 //		can2serial_->showCanMsg(info_.gps);
 		usleep(1000);
 	}
-	if(tracking_info_flag_)
+	if(!tracking_info_flag_)
 	{
-		can2serial_->sendCanMsg(info_.status);
-//		can2serial_->showCanMsg(info_.status);
+		uint16_t lateral_err = uint16_t(0.0*100) + 255;
+		info_.status.data[4] |= lateral_err%2 << 7;
+		info_.status.data[5] = lateral_err/2;
 	}
 	
-	
+	can2serial_->sendCanMsg(info_.status);
+//	can2serial_->showCanMsg(info_.status);
 }
 
 int main(int argc,char** argv)

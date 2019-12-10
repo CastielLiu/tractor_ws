@@ -1,0 +1,22 @@
+<!-- -->
+<launch>
+
+	<node name="interface_node" pkg="interface" type="interface_node" output="screen">
+		<param name="can2serial_port" value="/dev/ttyUSB0"/>
+		<param name="can_baudrate" value="250"/>
+	</node>
+	
+	<node name="path_tracking" pkg="path_tracking" type="path_tracking_node" output="screen">
+		<param name="path_file_dir" value="$(find record_path)/data"/>
+		<param name="foreSightDis_speedCoefficient" value="1.8"/>
+		<param name="foreSightDis_speedCoefficient" value="1.8"/>
+		<param name="min_foresight_distance" value="5.0"/>
+		<param name="wheel_base" value="1.5"/>
+	</node>
+	
+	<node name="record_path_node" pkg="record_path" type="record_path_node" output="screen">
+		<param name="file_path" value="$(find record_path)/data/"/>
+		<param name="sample_distance" value="0.1"/>
+	</node>
+	
+</launch>
