@@ -10,7 +10,7 @@
 #include <driverless_msgs/PathTrackingInfo.h>
 #include <interface/RecordPath.h>
 #include <interface/Driverless.h>
-
+#include <interface/Other.h>
 
 class Interface
 {
@@ -25,6 +25,7 @@ class Interface
 	void odom_callback(const nav_msgs::Odometry::ConstPtr& gps);
 	void timer_callback(const ros::TimerEvent& event);
 	void path_tracking_info_callback(const driverless_msgs::PathTrackingInfo::ConstPtr& );
+	bool otherService(interface::Other::Request  &req, interface::Other::Response &res);
 	enum 
 	{
 		GPS_CAN_ID = 0x301,
@@ -61,6 +62,8 @@ class Interface
 	
 	ros::ServiceClient client_driverless_;
 	interface::Driverless srv_driverless_;
+	
+	ros::ServiceServer other_srv_nh_;
 };
 
 

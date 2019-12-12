@@ -19,6 +19,7 @@ add_service_files(
 	FILES
 	RecordPath.srv
 	Driverless.srv
+	Other.srv
 )
 
 generate_messages()

@@ -9,6 +9,7 @@
 #define PI_ 3.141592653589
 #endif
 
+/* current state   */
 #define RecorderIdle 1
 #define CurveRecording 2
 #define VertexRecording 3
@@ -90,17 +91,24 @@ bool Recorder::recordPathService(interface::RecordPath::Request  &req,
 	}
 	if(req.command_type == req.START_RECORD_PATH )
 	{
-		if(this->status_ != RecorderIdle)
+		if(this->status_ == CurveRecording || this->status_ == VertexRecording)
 		{
-			ROS_ERROR("Recording in progress, instruction invalid!");
-			res.success = Fail;
+			res.success = Success;
 			return true;
 		}
+		
 		ROS_INFO("command: START_RECORD_PATH");
 		if(req.path_type ==req.CURVE_TYPE)
+		{
 			this->status_ = CurveRecording;
+			last_point = {0.0,0.0,0.0,0.0,0.0}; 
+		}
 		else if(req.path_type == req.VERTEX_TYPE)
+		{
+			last_point = {0.0,0.0,0.0,0.0,0.0}; 
 			this->status_ = VertexRecording;
+		}
+			
 		else
 		{
 			ROS_ERROR("Expected path type error !");
@@ -127,8 +135,7 @@ bool Recorder::recordPathService(interface::RecordPath::Request  &req,
 			res.success = Fail;
 			return true;
 		}
-		static gpsMsg_t _last_point;
-		float dis = dis2Points(current_point, _last_point, true);
+		float dis = dis2Points(current_point, last_point, true);
 		
 		if(dis < 1.0)
 		{
@@ -138,12 +145,13 @@ bool Recorder::recordPathService(interface::RecordPath::Request  &req,
 		ROS_INFO("RECORD_CURRENT_POINT: %.3f\t%.3f\t%.3f",current_point.x,current_point.y,current_point.yaw);
 		fprintf(fp_,"%.3f\t%.3f\t%.3f\r\n",current_point.x,current_point.y,current_point.yaw);
 		fflush(fp_);
+		last_point = current_point;
 	}
 	else if(req.command_type == req.STOP_RECORD_PATH)
 	{
 		if(this->status_ == RecorderIdle)
 		{
-			res.success = Fail;
+			res.success = Success;
 			return true;
 		}
 		ROS_INFO("RECORD_complete");

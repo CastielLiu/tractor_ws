@@ -13,8 +13,4 @@ float32 speed
 ---
 
 uint8  success
-uint8  FILE_NOT_EXISTS = 1
-uint8  PATH_TYPE_ERROR = 2
-uint8  CMD_TYPE_ERROR = 3
-uint8  FAILED = 10
-uint8  OK = 255
+

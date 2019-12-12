@@ -1,5 +1,5 @@
-#include<ros/ros.h>
-#include<interface/interface.h>
+#include <ros/ros.h>
+#include <interface/interface.h>
 
 
 Interface::Interface():
@@ -28,6 +28,7 @@ bool Interface::init()
 	
 	client_recordPath_ = nh.serviceClient<interface::RecordPath>("record_path_service");
 	client_driverless_ = nh.serviceClient<interface::Driverless>("driverless_service");
+	other_srv_nh_ = nh.advertiseService("other_service",&Interface::otherService, this);
 	
 	nh_private.param<std::string>("can2serial_port",can2serial_port_,"");
 	nh_private.param<int>("can_baudrate",can_baudrate_,250);
@@ -70,7 +71,7 @@ void Interface::readCanMsg()
 			usleep(10000);
 			continue;
 		}
-		//can2serial_->showCanMsg(can_msg);
+		can2serial_->showCanMsg(can_msg);
 		switch(can_msg.ID)
 		{
 			int file_seq;
@@ -90,7 +91,7 @@ void Interface::readCanMsg()
 				srv_driverless_.request.path_type = can_msg.data[2];
 				file_seq = can_msg.data[1]*256 + can_msg.data[0];
 				// seq_type.txt
-				srv_driverless_.request.path_file_name = std::to_string(file_seq)+"_"+ std::to_string(srv_record_path_.request.path_type)+".txt";
+				srv_driverless_.request.path_file_name = std::to_string(file_seq)+"_"+ std::to_string(srv_driverless_.request.path_type)+".txt";
 				srv_driverless_.request.speed = can_msg.data[4];
 				ROS_INFO("requestDriveless:%s\ttype:%d\tcmd:%d",srv_driverless_.request.path_file_name.c_str(),srv_driverless_.request.path_type,srv_driverless_.request.command_type);
 				client_driverless_.call(srv_driverless_);
@@ -138,6 +139,16 @@ void Interface::path_tracking_info_callback(const driverless_msgs::PathTrackingI
 	info_.status.data[5] = lateral_err/2;
 }
 
+bool Interface::otherService(interface::Other::Request  &req,
+							 interface::Other::Response &res)
+{
+	if(req.data == "path tracking complete")
+	{
+		;
+	}
+	
+	return true;
+}
 
 void Interface::timer_callback(const ros::TimerEvent& event)
 {

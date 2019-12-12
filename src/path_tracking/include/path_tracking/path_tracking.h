@@ -4,11 +4,12 @@
 #include<boost/filesystem.hpp>
 #include<driverless_msgs/PathTrackingInfo.h>
 #include<interface/Driverless.h>
+#include<interface/Other.h>
 #include<driverless_msgs/ControlCmd.h>
 #include"path_tracking/function.h"
 #include<std_msgs/Float32.h>
 #include<std_msgs/Float32.h>
-#include<nav_msgs/Odometry.h> 
+#include<nav_msgs/Odometry.h>
 #include<boost/thread.hpp>
 #include<std_msgs/UInt32.h>
 #include<std_msgs/UInt8.h>
@@ -40,6 +41,7 @@ private:
 	void publishInfo();
 	bool driverlessService(interface::Driverless::Request  &req,
 									 interface::Driverless::Response &res);
+	bool callOtherService(const std::string& data);
 	void pathTrackingThread(const fs::path& file, float speed);
 private:
 	
@@ -54,6 +56,7 @@ private:
 	ros::Publisher pub_info_;
 	
 	ros::ServiceServer srv_driverless_;
+	ros::ServiceClient other_client_nh_;
 	
 	boost::shared_ptr<boost::thread> rosSpin_thread_ptr_;
 	boost::shared_ptr<boost::thread> tracking_thread_ptr_;
@@ -91,16 +94,7 @@ private:
 	float foreSightDis_latErrCoefficient_;
 	float wheel_base_;
 	
-	enum status_t
-	{
-		Idle = 0,
-		Suspend = 1,
-		Stop = 4,
-		VertexTracking = 2,
-		CurveTracking = 3,
-		
-	}status_;
-	
+	int status_;
 };
 
 

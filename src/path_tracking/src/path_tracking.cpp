@@ -1,5 +1,18 @@
 #include "path_tracking/path_tracking.h"
 
+/* current state   */
+#define TrackerIdle    0
+#define TrackerSuspend 1
+#define TrackerStop    2
+#define VertexTracking 3
+#define CurveTracking  4
+
+
+/*recod path response*/
+#define Success         0
+#define FileNotExist    1
+#define Fail            2
+
 
 PathTracking::PathTracking():
 	target_point_index_(0),
@@ -7,7 +20,7 @@ PathTracking::PathTracking():
 	avoiding_offset_(0.0),
 	max_roadwheelAngle_(25.0),
 	is_avoiding_(false),
-	status_(Idle)
+	status_(TrackerIdle)
 {
 	cmd_.set_speed =0.0;
 	cmd_.set_roadWheelAngle =0.0;
@@ -30,6 +43,7 @@ bool PathTracking::init(ros::NodeHandle nh,ros::NodeHandle nh_private)
 	pub_info_ = nh.advertise<driverless_msgs::PathTrackingInfo>("/path_tracking_info",1);
 	
 	srv_driverless_ = nh.advertiseService("driverless_service",&PathTracking::driverlessService,this);
+	other_client_nh_ = nh.serviceClient<interface::Other>("other_service");
 	
 	nh_private.param<std::string>("path_file_dir",path_file_dir_,"");
 	
@@ -56,7 +70,6 @@ bool PathTracking::init(ros::NodeHandle nh,ros::NodeHandle nh_private)
 		ROS_INFO("[Path Tracking]: gps data is invalid, please check the gps topic or waiting...");
 		sleep(1);
 	}
-	
 	return true;
 }
 
@@ -65,15 +78,15 @@ bool PathTracking::driverlessService(interface::Driverless::Request  &req,
 {
 	if(req.command_type == req.START)
 	{
-		if(this->status_ != Idle)
+		if(this->status_ == VertexTracking || this->status_ == CurveTracking)
 		{
-			res.success = res.FAILED;
+			res.success = Success;
 			return true;
 		}
 		fs::path file = fs::path(path_file_dir_)/req.path_file_name;
 		if(!fs::exists(file))
 		{
-			res.success = res.FILE_NOT_EXISTS;
+			res.success = FileNotExist;
 			return true;
 		}
 		if(req.path_type == req.CURVE_TYPE)
@@ -82,23 +95,23 @@ bool PathTracking::driverlessService(interface::Driverless::Request  &req,
 			this->status_ = VertexTracking;
 		else
 		{
-			res.success = res.PATH_TYPE_ERROR;
+			res.success = Fail;
 			return true;
 		}
 		
 		tracking_thread_ptr_ = boost::shared_ptr<boost::thread >(new boost::thread(boost::bind(&PathTracking::pathTrackingThread, this,file,req.speed)));
 	}
 	else if(req.command_type == req.STOP)
-		this->status_ = Stop;
+		this->status_ = TrackerStop;
 	else if(req.command_type == req.SUSPEND)
-		this->status_ = Suspend;
+		this->status_ = TrackerSuspend;
 	else
 	{
-		res.success = res.CMD_TYPE_ERROR;
+		res.success = Fail;
 		return true;
 	}
 	
-	res.success = res.OK;
+	res.success = Success;
 	return true;
 }
 
@@ -112,12 +125,14 @@ void PathTracking::pathTrackingThread(const fs::path& file, float speed)
 	{
 		path_points_.clear();
 		loadPathPoints(file_name, path_points_);
+		ROS_INFO("CurveTracking__path points size:%lu",path_points_.size());
 	}
 	else if(status_ == VertexTracking)
 	{
 		std::vector<gpsMsg_t> vertexes;
 		loadPathPoints(file_name,vertexes);
 		generatePathByVertexes(vertexes,path_points_,0.1);
+		ROS_INFO("VertexTracking__path points size:%lu",path_points_.size());
 	}
 	
 	ROS_INFO("path points size:%lu",path_points_.size());
@@ -129,13 +144,13 @@ void PathTracking::pathTrackingThread(const fs::path& file, float speed)
 	
 	target_point_index_ = findNearestPoint(path_points_,current_point_);
 	
-	ROS_INFO("target_point_index_: %lu",target_point_index_);
+	ROS_INFO("nearest_point_index: %lu",target_point_index_);
 	
 	if(target_point_index_ > path_points_.size() - 10)
 	{
 		ROS_INFO("target index:%lu,  file read over, No target point was found !!!",target_point_index_);
-		this->status_ = Idle;
-		return ;
+//		this->status_ = TrackerIdle;
+//		return ;
 	}
 	
 	target_point_ = path_points_[target_point_index_];
@@ -146,12 +161,12 @@ void PathTracking::pathTrackingThread(const fs::path& file, float speed)
 	
 	while(ros::ok() && target_point_index_ < path_points_.size()-2)
 	{
-		if(status_ == Suspend)
+		if(status_ == TrackerSuspend)
 			continue;
-		else if(status_ == Idle)
+		else if(status_ == TrackerStop)
 			break;
 			
-		
+//		ROS_INFO("target_point_index_: %d", target_point_index_);
 		if( avoiding_offset_ != 0.0)
 			target_point_ = pointOffset(target_point_,avoiding_offset_);
 		
@@ -196,11 +211,11 @@ void PathTracking::pathTrackingThread(const fs::path& file, float speed)
 		this->publishInfo();
 		loop_rate.sleep();
 	}
-
+	callOtherService("auto_drive_complete");
+	
 	ROS_INFO("driverless completed..."); //send msg to screen ??????/
 
-	this->status_ = Stop;
-
+	this->status_ = TrackerStop;
 }
 
 void PathTracking::run()
@@ -223,16 +238,16 @@ void PathTracking::publishInfo()
 
 void PathTracking::timer_callback(const ros::TimerEvent&)
 {
-	if(this->status_ == Idle)
+	if(this->status_ == TrackerIdle)
 	{
 		cmd_.driverless_mode = false;
 	}
-	else if(this->status_ == Suspend)
+	else if(this->status_ == TrackerSuspend)
 	{
 		cmd_.driverless_mode = true;
 		cmd_.set_brake = 1;
 	}
-	else if(this->status_ == Stop)
+	else if(this->status_ == TrackerStop)
 	{
 		static bool is_first = false;
 		static ros::Time first_time;
@@ -243,7 +258,7 @@ void PathTracking::timer_callback(const ros::TimerEvent&)
 		}
 		else if((ros::Time::now() - first_time).toSec() > 10.0)
 		{
-			this->status_ = Idle;
+			this->status_ = TrackerIdle;
 			is_first = false;
 		}
 		cmd_.driverless_mode = true;
@@ -274,6 +289,13 @@ void PathTracking::avoiding_flag_callback(const std_msgs::Float32::ConstPtr& msg
 {
 	//avoid to left(-) or right(+) the value presents the offset
 	avoiding_offset_ = msg->data;
+}
+
+bool PathTracking::callOtherService(const std::string& data)
+{
+	interface::Other other;
+	other.request.data = data;
+	other_client_nh_.call(other);
 }
 
 int main(int argc,char**argv)
