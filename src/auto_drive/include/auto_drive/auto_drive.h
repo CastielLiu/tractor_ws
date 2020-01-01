@@ -13,7 +13,7 @@ class AutoDrive
   public:
     AutoDrive();
     ~AutoDrive();
-    bool init(ros::NodeHandle nh, ros::NodeHandle nh_private);
+    bool init();
     void run();
     void autoDriveThread(const fs::path& file, float speed);
     void odom_callback(const nav_msgs::Odometry::ConstPtr& msg);

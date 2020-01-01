@@ -26,9 +26,9 @@
 class PathTracking
 {
 public:
-	PathTracking(ros::NodeHandle nh,ros::NodeHandle nh_private);
+	PathTracking(const ros::NodeHandle& nh, const ros::NodeHandle& nh_private);
 	~PathTracking();
-	bool init();
+	bool init(const gpsMsg_t& current_point );
 	void setPathPoints(const std::vector<gpsMsg_t>& points);
 	int update(float speed, float road_wheelangle,  //vehicle state
 			   const gpsMsg_t& current_point,      //vehicle positoin

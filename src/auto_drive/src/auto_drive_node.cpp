@@ -23,14 +23,13 @@ AutoDrive::AutoDrive():
 	cmd_.set_roadWheelAngle =0.0;
 }
 
+AutoDrive::~AutoDrive()
+{
+
+}
 
 bool AutoDrive::init()
 {
-    sub_utm_ = nh.subscribe("/ll2utm",1,&AutoDrive::odom_callback,this);
-    pub_cmd_ = nh_.advertise<driverless_msgs::ControlCmd>("/cmd",1);
-    srv_driverless_ = nh_.advertiseService("driverless_service",&AutoDrive::driverlessService,this);
-	other_client_nh_ = nh_.serviceClient<interface::Other>("other_service");
-
     nh_private_.param<float>("max_speed",max_speed_,20.0);//km/h
     nh_private_.param<std::string>("path_file_dir",path_file_dir_,"");
 	if(path_file_dir_.empty())
@@ -38,15 +37,18 @@ bool AutoDrive::init()
 		ROS_ERROR("no input path file directory !!!");
 		return false;
 	}
-}
+	sub_utm_ = nh_.subscribe("/ll2utm",1,&AutoDrive::odom_callback,this);
 
-void AutoDrive::run()
-{
-    while(ros::ok() && !is_gps_data_valid(current_point_))
+	// wait for system ok
+	while(ros::ok() && !is_gps_data_valid(current_point_))
 	{
 		ROS_INFO("[AutoDrive]: gps data is invalid, please check the gps topic or waiting...");
-		sleep(1);
+		sleep(0.5);
 	}
+
+    pub_cmd_ = nh_.advertise<driverless_msgs::ControlCmd>("/cmd",1);
+    srv_driverless_ = nh_.advertiseService("driverless_service",&AutoDrive::driverlessService,this);
+	other_client_nh_ = nh_.serviceClient<interface::Other>("other_service");
 }
 
 bool AutoDrive::callOtherService(const std::string& data)
@@ -122,12 +124,12 @@ void AutoDrive::autoDriveThread(const fs::path& file, float speed)
 	ROS_INFO("path points size:%lu",path_points_.size());
 	
 	this->tracker_.setPathPoints(path_points_);
-    if(!tracker_.init())
+    if(!tracker_.init(current_point_))
         return;
+	if(!avoider_.init())
+		return;
 	
-	ros::Rate loop_rate(30);
-	
-	int cnt = 0;
+	ros::Rate loop_rate(20);
 	
 	while(ros::ok())
 	{
@@ -198,16 +200,14 @@ void AutoDrive::odom_callback(const nav_msgs::Odometry::ConstPtr& msg)
 	current_point_.latitude = msg->pose.covariance[2];
 }
 
-
-
 int main(int argc, char *argv[])
 {
     ros::init(argc, argv, "auto_drive_node");
+	ros::AsyncSpinner spinner(4);
+	spinner.start(); //非阻塞
+
     AutoDrive auto_drive;
-    auto_drive.init();
-    
-    ros::AsyncSpinner spinner(4);
-    spinner.start(); //非阻塞
-    ros::waitForShutdown();
+    if(auto_drive.init())
+    	ros::waitForShutdown();
     return 0;
 }  

@@ -19,7 +19,7 @@ typedef struct
 }gpsMsg_t;
 
 
-bool calculateDis2path(const double& X_,const double& Y_, //point corrdinate
+inline bool calculateDis2path(const double& X_,const double& Y_, //point corrdinate
 						 const std::vector<gpsMsg_t>& path_points, //path points
 						 const size_t& target_point_index, //the reference point index
 						 size_t& nearest_point_index,
@@ -142,14 +142,14 @@ bool calculateDis2path(const double& X_,const double& Y_, //point corrdinate
 	return true;
 }
 
-bool is_gps_data_valid(gpsMsg_t& point)
+inline bool is_gps_data_valid(gpsMsg_t& point)
 {
 	if(fabs(point.x) >100 && fabs(point.y) >100)
 		return true;
 	return false;
 }
 
-float dis2Points(const gpsMsg_t& point1, const gpsMsg_t& point2,bool is_sqrt)
+inline float dis2Points(const gpsMsg_t& point1, const gpsMsg_t& point2,bool is_sqrt)
 {
 	float x = point1.x - point2.x;
 	float y = point1.y - point2.y;
@@ -159,7 +159,7 @@ float dis2Points(const gpsMsg_t& point1, const gpsMsg_t& point2,bool is_sqrt)
 	return x*x+y*y;
 }
 
-std::pair<float, float> get_dis_yaw(gpsMsg_t &point1,gpsMsg_t &point2)
+inline std::pair<float, float> get_dis_yaw(const gpsMsg_t &point1, const gpsMsg_t &point2)
 {
 	float x = point1.x - point2.x;
 	float y = point1.y - point2.y;
@@ -173,7 +173,7 @@ std::pair<float, float> get_dis_yaw(gpsMsg_t &point1,gpsMsg_t &point2)
 	return dis_yaw;
 }
 
-int findNearestPoint(const std::vector<gpsMsg_t>& path_points, const gpsMsg_t& current_point)
+inline int findNearestPoint(const std::vector<gpsMsg_t>& path_points, const gpsMsg_t& current_point)
 {
 	int index = 0;
 	float min_dis = FLT_MAX;
@@ -202,7 +202,7 @@ int findNearestPoint(const std::vector<gpsMsg_t>& path_points, const gpsMsg_t& c
 	return index;
 }
 
-gpsMsg_t pointOffset(const gpsMsg_t& point,float offset)
+inline gpsMsg_t pointOffset(const gpsMsg_t& point,float offset)
 {
 	gpsMsg_t result = point; //copy all infos of point
 	result.x =  offset * cos(point.yaw) + point.x;
@@ -210,14 +210,14 @@ gpsMsg_t pointOffset(const gpsMsg_t& point,float offset)
 	return result;
 }
 
-float generateRoadwheelAngleByRadius(const float& radius, const float& wheel_base)
+inline float generateRoadwheelAngleByRadius(const float& radius, const float& wheel_base)
 {
 	assert(radius!=0);
 	//return asin(AXIS_DISTANCE /radius)*180/M_PI;  //the angle larger
 	return atan(wheel_base/radius)*180/M_PI;    //correct algorithm 
 }
 
-bool loadPathPoints(std::string file_path,std::vector<gpsMsg_t>& points)
+inline bool loadPathPoints(std::string file_path,std::vector<gpsMsg_t>& points)
 {
 	
 	FILE *fp = fopen(file_path.c_str(),"r");
@@ -239,7 +239,7 @@ bool loadPathPoints(std::string file_path,std::vector<gpsMsg_t>& points)
 	return true;
 }
 
-bool generatePathByVertexes(const std::vector<gpsMsg_t>& vertexes,std::vector<gpsMsg_t>& pathPoints,float increment)
+inline bool generatePathByVertexes(const std::vector<gpsMsg_t>& vertexes,std::vector<gpsMsg_t>& pathPoints,float increment)
 {
 	if(vertexes.size()<2)
 		return false;

@@ -1,29 +1,32 @@
 #include "auto_drive/path_tracking.h"
 
-PathTracking::PathTracking(ros::NodeHandle nh,ros::NodeHandle nh_private)
+PathTracking::PathTracking(const ros::NodeHandle& nh, const ros::NodeHandle& nh_private):
+	nh_(nh),
+    nh_private_(nh_private)
 {
-	pub_info_ = nh.advertise<driverless_msgs::PathTrackingInfo>("/path_tracking_info",1);
-
-	nh_private.param<float>("foreSightDis_speedCoefficient", foreSightDis_speedCoefficient_,1.8);
-	nh_private.param<float>("foreSightDis_latErrCoefficient", foreSightDis_latErrCoefficient_,0.3);
-	
-	nh_private.param<float>("min_foresight_distance",min_foresight_distance_,4.0);
-	nh_private.param<float>("wheel_base", wheel_base_, 1.5);
 }
 
 PathTracking::~PathTracking()
 {
 }
 
-bool PathTracking::init()
+bool PathTracking::init(const gpsMsg_t& current_point)
 {
+	pub_info_ = nh_.advertise<driverless_msgs::PathTrackingInfo>("/path_tracking_info",1);
+
+	nh_private_.param<float>("foreSightDis_speedCoefficient", foreSightDis_speedCoefficient_,1.8);
+	nh_private_.param<float>("foreSightDis_latErrCoefficient", foreSightDis_latErrCoefficient_,0.3);
+	
+	nh_private_.param<float>("min_foresight_distance",min_foresight_distance_,4.0);
+	nh_private_.param<float>("wheel_base", wheel_base_, 1.5);
+
 	if(path_points_.empty())
 	{
 		ROS_ERROR("[PathTracking]: please call setPathPoints before init pathTracking!");
 		return false;
 	}
 
-	nearest_point_index_ = findNearestPoint(path_points_, current_point_);
+	nearest_point_index_ = findNearestPoint(path_points_, current_point);
 	if(nearest_point_index_ <0)
 		return false;
 
@@ -44,7 +47,7 @@ int PathTracking::update(float speed, float road_wheelangle,  //vehicle state
 	static int cnt = 0;
 	target_point_ = path_points_[target_point_index_];
 	
-	bool ok = calculateDis2path(current_point_.x, current_point_.y, path_points_, target_point_index_, //input
+	bool ok = calculateDis2path(current_point.x, current_point.y, path_points_, target_point_index_, //input
 					  nearest_point_index_, lateral_err_); //output
 	// lateral_err_ = lateral_err_ - path_offset; 
 	if(!ok) //path points track over
@@ -55,14 +58,14 @@ int PathTracking::update(float speed, float road_wheelangle,  //vehicle state
 	if( path_offset != 0.0)
 		target_point_ = pointOffset(target_point_, path_offset);
 
-	std::pair<float, float> dis_yaw = get_dis_yaw(target_point_, current_point_);
+	std::pair<float, float> dis_yaw = get_dis_yaw(target_point_, current_point);
 
 	if( dis_yaw.first < disThreshold_)
 	{
 		++target_point_index_;
 		
 	}
-	float yaw_err = dis_yaw.second - current_point_.yaw;
+	float yaw_err = dis_yaw.second - current_point.yaw;
 	
 	if(yaw_err==0.0)
 		return 0;
@@ -107,4 +110,3 @@ void PathTracking::publishInfo()
 
 	pub_info_.publish(info_);
 }
-
