@@ -34,7 +34,7 @@ bool PathTracking::init(ros::NodeHandle nh,ros::NodeHandle nh_private)
 {
 	sub_utm_ = nh.subscribe("/ll2utm",1,&PathTracking::odom_callback,this);
 
-	sub_avoiding_from_lidar_ = nh.subscribe("/start_avoiding",1,&PathTracking::avoiding_flag_callback,this);
+	sub_path_offset_ = nh.subscribe("/path_offset",1,&PathTracking::avoiding_flag_callback,this);
 	
 	pub_cmd_ = nh.advertise<driverless_msgs::ControlCmd>("/cmd",1);
 	

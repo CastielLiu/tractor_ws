@@ -1,0 +1,33 @@
+cmake_minimum_required(VERSION 2.8.3)
+project(auto_drive)
+
+add_compile_options(-std=c++11)
+
+find_package(catkin REQUIRED COMPONENTS
+  driverless_msgs
+  roscpp
+  rospy
+  serial
+  std_msgs
+)
+
+## System dependencies are found with CMake's conventions
+# find_package(Boost REQUIRED COMPONENTS system)
+
+
+catkin_package(
+#  INCLUDE_DIRS include
+#  LIBRARIES auto_drive
+#  CATKIN_DEPENDS driverless_msgs roscpp rospy serial std_msgs
+#  DEPENDS system_lib
+)
+
+
+include_directories(
+ include
+  ${catkin_INCLUDE_DIRS}
+)
+
+add_executable(${PROJECT_NAME}_node src/auto_drive_node.cpp src/avoiding.cpp src/path_tracking.cpp)
+add_dependencies(${PROJECT_NAME}_node ${${PROJECT_NAME}_EXPORTED_TARGETS} ${catkin_EXPORTED_TARGETS})
+target_link_libraries(${PROJECT_NAME}_node ${catkin_LIBRARIES})

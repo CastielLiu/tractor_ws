@@ -47,7 +47,7 @@ private:
 	
 	ros::Subscriber sub_utm_;
 	
-	ros::Subscriber sub_avoiding_from_lidar_;
+	ros::Subscriber sub_path_offset_;
 	
 	ros::Timer timer_;
 	

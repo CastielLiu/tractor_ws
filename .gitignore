@@ -2,3 +2,8 @@ build/
 devel/
 .catkin_workspace
 core
+devel_isolated/
+el/
+el_isolated/
+.vscode/
+.ycm*
