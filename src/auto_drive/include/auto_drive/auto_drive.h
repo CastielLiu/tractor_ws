@@ -29,7 +29,7 @@ class AutoDrive
 	float max_roadwheelAngle_;
     gpsMsg_t current_point_;
     std::string path_file_dir_;
-    std::vector<gpsMsg_t> path_points_;
+    path_t path_;
 
 	ros::Timer timer_;
 	ros::Publisher pub_cmd_;

@@ -2,8 +2,10 @@
 
 Avoiding::Avoiding(const ros::NodeHandle& nh, const ros::NodeHandle& nh_private):
     nh_(nh),
-    nh_private_(nh_private)
+    nh_private_(nh_private),
+	is_running_(false)
 {
+	danger_distance_front_ = 5.0;
 }
 
 Avoiding::~Avoiding()
@@ -13,124 +15,144 @@ Avoiding::~Avoiding()
 
 bool Avoiding::init()
 {
-    nh_private.param<std::string>("objects_topic",objects_topic_,"/detected_bounding_boxs");
-	nh_private.param<float>("deceleration_cofficient",deceleration_cofficient_,50);
-	nh_private.param<float>("safety_distance_side",safety_distance_side_,0.4);
-	nh_private.param<float>("danger_distance_side",danger_distance_side_,0.25);
-	nh_private.param<float>("pedestrian_detection_area_side",pedestrian_detection_area_side_,safety_distance_side_+1.0);
-	nh_private.param<float>("max_deceleration",max_deceleration_,5.0); 
-    sub_objects_msg_ = nh.subscribe(objects_topic_,1,&Avoiding::objects_callback,this);
+	if(is_running_)
+	{
+		ROS_ERROR("[Avoiding]: avoider is running, Need not reinit!");
+		return false;
+	}
+    nh_private_.param<std::string>("objects_topic",objects_topic_,"/detected_bounding_boxs");
+	nh_private_.param<float>("deceleration_cofficient",deceleration_cofficient_,50);
+	nh_private_.param<float>("safety_distance_side",safety_distance_side_,0.4);
+	nh_private_.param<float>("danger_distance_side",danger_distance_side_,0.25);
+	nh_private_.param<float>("pedestrian_detection_area_side",pedestrian_detection_area_side_,safety_distance_side_+1.0);
+	nh_private_.param<float>("max_deceleration",max_deceleration_,5.0); 
+	nh_private_.param<float>("vehicle_width", vehicle_width_, 1.5);
+	nh_private_.param<float>("vehicle_length", vehicle_length_, 3.0);
+    sub_objects_msg_ = nh_.subscribe(objects_topic_,1,&Avoiding::objects_callback,this);
+	is_running_ = true;
     return true;
+}
+
+void Avoiding::shutDown()
+{
+	sub_objects_msg_.shutdown();
+	is_running_ = false;
+}
+
+void Avoiding::setPath(const path_t& path)
+{
+	path_mutex_.lock();
+	path_ = path;
+	path_mutex_.unlock();
 }
 
 float Avoiding::getAvoidOffset()
 {
+	avoiding_offest_mutex_.lock();
     return avoiding_offest_;
+	avoiding_offest_mutex_.unlock();
 }
 
-bool Avoiding::update(float speed, float road_wheelangle, const gpsMsg_t& current_point)
+controlMsg_t Avoiding::getControlMsg()
 {
+	std::lock_guard<std::mutex> lc(control_msg_mutex_);
+	return control_msg_;
+}
+
+bool Avoiding::update(float speed, float road_wheelangle, size_t current_point_index)
+{
+	if(!is_running_)
+		return false;
     road_wheelangle_ = road_wheelangle;
     vehicle_speed_ = speed;
-    current_point_ = current_point;
+	current_point_index_ = current_point_index;
+    current_point_ = path_.points[current_point_index_];
+	return true;
 }
 
-void Avoiding::objects_callback(const jsk_recognition_msgs::BoundingBoxArray::ConstPtr& objects)
+void Avoiding::objects_callback(const jsk_recognition_msgs::BoundingBoxArray::ConstPtr& msgs)
 {
-	size_t n_object = objects->boxes.size();
+	size_t n_object = msgs->boxes.size();
 	
 	if(n_object==0)
 	{
-		avoiding_offest_ = 0.0)
+		avoiding_offest_ = 0.0;
 		return;
 	}
-	
-	size_t *indexArray = new size_t[n_object];
-	float * dis2vehicleArray = new float[n_object];
-	float * dis2pathArray = new float[n_object];
-	
-	//object position in vehicle coordination (x,y)
-	//object position in  world  coordination (X,Y)
-	float x,y;  double X,Y;
-	
-	for(size_t i=0; i< n_object; i++)
+	std::vector<object_t> objects(n_object);
+	for(int i=0; i<n_object; ++i)
 	{
-		const jsk_recognition_msgs::BoundingBox& object =  objects->boxes[i];
-		
-		x = - object.pose.position.y;
-		y =   object.pose.position.x;
-		
-		X =  x * cos(current_point_.yaw) + y * sin(current_point_.yaw) + current_point_.x;
-		Y = -x * sin(current_point_.yaw) + y * cos(current_point_.yaw) + current_point_.y;
-		
-		indexArray[i] = i;
-		dis2vehicleArray[i] = sqrt(x * x + y * y);
-        size_t nearest_point_index;
-        bool ok = calculateDis2path(X, Y, path_points_, target_point_index_, //input
-					                nearest_point_index, dis2pathArray[i]); //output
-	 
-	    if(!ok)
-        {
-            ROS_INFO("[Avoiding]: calculateDis2path failed");
-            return ;
-        }
-		//printf("target x:%f\ty:%f\t X:%f\tY:%f\t\n",x,y,X,Y);
-		//printf("car X:%f\t Y:%f\t yaw:%f\n",current_point_.x,current_point_.y,current_point_.yaw);
-		//ROS_INFO("dis2path:%f\t dis2vehicle:%f\t x:%f  y:%f",dis2pathArray[i],dis2vehicleArray[i],x,y);
-	}
-	bubbleSort(dis2vehicleArray,indexArray,n_object);
+		const auto &box = msgs->boxes[i];
+		const auto &position = box.pose.position;
+		const geometry_msgs::Quaternion  &orientation = box.pose.orientation;
+		const auto &dimensions = box.dimensions;
+		tf::Quaternion quat;
+		double roll,yaw,pitch;
 
-	if(is_dangerous(objects, dis2vehicleArray, indexArray, dis2pathArray, n_object))
+		tf::quaternionMsgToTF(orientation, quat);//ros四元数 -> tf四元数
+		tf::Matrix3x3(quat).getRPY(roll, pitch, yaw);//tf四元数转欧拉角
+		objects[i].rect = rect_t(-position.y, position.x, yaw, dimensions.y, dimensions.x);
+		objects[i].rect.inflat(vehicle_width_); //障碍物膨胀
+	}
+	float forsight_distance = 10.0; //避障前视距离
+	size_t start_index = current_point_index_;
+	size_t end_index = current_point_index_ + forsight_distance/path_.resolution;
+	if(end_index >= path_.points.size())
 	{
-		this->emergencyBrake();//+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+		ROS_INFO("[Avoiding]: the remaind path points is not enough!")
+		this->shutDown();
 		return ;
 	}
-	
-	if(offset_msg_.data!=0.0 && is_backToOriginalLane(objects,dis2vehicleArray,indexArray,dis2pathArray,n_object))
+	//计算路径片段在车体坐标系下的坐标  ++++++++++++++++++++++++++++++++++++++++++++++
+	size_t points_cnt = end_index-start_index+1;
+	std::vector<position_t> local_path_points(points_cnt);
+	pose_t vehicle_pose = path_.points[current_point_index_];
+	for(int i=0; i<points_cnt; ++i)
 	{
-		backToOriginalLane();
+		position_t point_in_earth = path_.points[i];
+		local_path_points[i] = transform(point_in_earth, vehicle_pose);
 	}
-	
-	if(path_points_[nearest_point_index_].traffic_sign == TrafficSign_Ambulance)
+
+	//判断各目标是否为障碍物
+	for(int i=0; i<n_object; ++i)
 	{
-		bool is_ambulance = false;
-		bool is_changLaneSafety = true;
-		jsk_recognition_msgs::BoundingBox object; 
-		for(size_t i=0; i<n_object; i++)
+		const pose_t& object_pose = objects[i].rect.pose;
+		objects[i].is_obstacle = false;
+		for(int j=0; j<points_cnt; ++j)
 		{
-			object = objects->boxes[indexArray[i]];
-			float dis2path = dis2pathArray[indexArray[i]];
-			float safety_center_distance_x = g_vehicle_width/2 + object.dimensions.y/2 + safety_distance_side_;
-			if(object.pose.position.x < -2.0 && dis2path < 1.0) //ambulance
+			position_t point_in_object = transform(local_path_points[j], object_pose);
+
+			if(!inRect(objects[i].rect, point_in_object))
+				continue;
+			//路径点在目标矩形范围内
+			float distance = dis2Points(path_.points[j], path_.points[current_point_index_]);
+			if(distance <= danger_distance_front_) 
 			{
-				is_ambulance = true;
+				std::lock_guard<std::mutex> lc(control_msg_mutex_);
+				control_msg_.flag = true;  //所有目标计算完毕后，无特殊情况时，flag复位
+				control_msg_.brake = 1.0;
+				return ;
 			}
-			else if(object.pose.position.x <20.0 && dis2path >0.0 &&
-			       dis2path-3.0 < safety_center_distance_x)
-			{
-				is_changLaneSafety  = false; 
-				break;
-			}
-		}
-		if(is_ambulance && is_changLaneSafety)
-		{
-			offset_msg_.data = 2.5;
-			pub_avoid_msg_to_gps_.publish(offset_msg_);
+			objects[i].is_obstacle = true;
+			break;
 		}
 	}
-	else if(path_points_[nearest_point_index_].traffic_sign != TrafficSign_PickUp &&
-		   path_points_[nearest_point_index_].traffic_sign != TrafficSign_TempStop &&
-		   path_points_[nearest_point_index_].traffic_sign != TrafficSign_UTurn &&
-		   path_points_[nearest_point_index_].traffic_sign != TrafficSign_Avoid)
+	//
+	for(auto& object:objects)
 	{
-		//dis2vehicleArray was sorted but dis2pathArray not!
-		decision(objects, dis2vehicleArray,indexArray, dis2pathArray,n_object);
+		if(object.inners.size()==0)
+		{
+			object.is_obstacle = false;
+			continue;
+		}
+
 	}
-	
-	delete [] indexArray;
-	delete [] dis2vehicleArray;
-	delete [] dis2pathArray;
+
+
+
+	    
 }
+
 
 void Avoiding::bubbleSort(const float * distance, size_t * index, size_t length)
 {

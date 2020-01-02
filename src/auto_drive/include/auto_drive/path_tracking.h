@@ -29,7 +29,8 @@ public:
 	PathTracking(const ros::NodeHandle& nh, const ros::NodeHandle& nh_private);
 	~PathTracking();
 	bool init(const gpsMsg_t& current_point );
-	void setPathPoints(const std::vector<gpsMsg_t>& points);
+	void setPath(const path_t& path);
+	
 	int update(float speed, float road_wheelangle,  //vehicle state
 			   const gpsMsg_t& current_point,      //vehicle positoin
 			   const float& path_offset); 
@@ -38,10 +39,11 @@ public:
 private:
 	void publishInfo();
 private:
+	ros::NodeHandle nh_, nh_private_;
 	ros::Publisher pub_info_;
 	
-	std::mutex path_points_mutex_;
-	std::vector<gpsMsg_t> path_points_;
+	std::mutex path_mutex_;
+	path_t path_;
 	
 	size_t target_point_index_;
 	size_t nearest_point_index_;

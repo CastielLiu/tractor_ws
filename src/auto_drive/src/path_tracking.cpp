@@ -20,13 +20,13 @@ bool PathTracking::init(const gpsMsg_t& current_point)
 	nh_private_.param<float>("min_foresight_distance",min_foresight_distance_,4.0);
 	nh_private_.param<float>("wheel_base", wheel_base_, 1.5);
 
-	if(path_points_.empty())
+	if(path_.points.empty())
 	{
-		ROS_ERROR("[PathTracking]: please call setPathPoints before init pathTracking!");
+		ROS_ERROR("[PathTracking]: please call setPath before init pathTracking!");
 		return false;
 	}
 
-	nearest_point_index_ = findNearestPoint(path_points_, current_point);
+	nearest_point_index_ = findNearestPoint(path_, current_point);
 	if(nearest_point_index_ <0)
 		return false;
 
@@ -45,10 +45,10 @@ int PathTracking::update(float speed, float road_wheelangle,  //vehicle state
 	road_wheelangle_ = road_wheelangle;
 
 	static int cnt = 0;
-	target_point_ = path_points_[target_point_index_];
+	target_point_ = path_.points[target_point_index_];
 	
-	bool ok = calculateDis2path(current_point.x, current_point.y, path_points_, target_point_index_, //input
-					  nearest_point_index_, lateral_err_); //output
+	bool ok = calculateDis2path(current_point.x, current_point.y, path_, target_point_index_, //input
+					            nearest_point_index_, lateral_err_); //output
 	// lateral_err_ = lateral_err_ - path_offset; 
 	if(!ok) //path points track over
 		return 2;
@@ -85,13 +85,11 @@ int PathTracking::update(float speed, float road_wheelangle,  //vehicle state
 	this->publishInfo();
 }
 
-void PathTracking::setPathPoints(const std::vector<gpsMsg_t>& points)
+void PathTracking::setPath(const path_t& path)
 {
-	path_points_mutex_.lock();
-    path_points_.resize(points.size());
-	for(int i=0; i<points.size(); ++i)
-	    path_points_[i] = points[i];
-	path_points_mutex_.unlock();
+	path_mutex_.lock();
+    path_ = path;
+	path_mutex_.unlock();
 }
 
 void PathTracking::getTrackingCmd(float& speed, float& roadWheelAngle)

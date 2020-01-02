@@ -109,23 +109,26 @@ void AutoDrive::autoDriveThread(const fs::path& file, float speed)
 	std::string file_name = fs::system_complete(file).string();
 	if(status_ == CurveTracking)
 	{
-		path_points_.clear();
-		loadPathPoints(file_name, path_points_);
-		ROS_INFO("CurveTracking__path points size:%lu",path_points_.size());
+		path_.clear();
+		loadPath(file_name, path_);
+		ROS_INFO("CurveTracking__path points size:%lu",path_.points.size());
 	}
 	else if(status_ == VertexTracking)
 	{
-		std::vector<gpsMsg_t> vertexes;
-		loadPathPoints(file_name,vertexes);
-		generatePathByVertexes(vertexes,path_points_,0.1);
-		ROS_INFO("VertexTracking__path points size:%lu",path_points_.size());
+		path_t vertex_path;
+		loadPath(file_name,vertex_path);
+		generatePathByVertexes(vertex_path, path_.points, 0.1);
+		ROS_INFO("VertexTracking__path points size:%lu",path_.points.size());
 	}
 	
-	ROS_INFO("path points size:%lu",path_points_.size());
+	ROS_INFO("path points size:%lu",path_.points.size());
 	
-	this->tracker_.setPathPoints(path_points_);
+	//配置路径跟踪控制器
+	this->tracker_.setPath(path_);
     if(!tracker_.init(current_point_))
         return;
+	//配置避障控制器
+	avoider_.setPath(path_);
 	if(!avoider_.init())
 		return;
 	
@@ -152,6 +155,8 @@ void AutoDrive::autoDriveThread(const fs::path& file, float speed)
 	ROS_INFO("driverless completed..."); //send msg to screen ??????/
 
 	this->status_ = TrackerStop;
+	avoider_.shutDown();
+	
 }
 
 void AutoDrive::timer_callback(const ros::TimerEvent&)

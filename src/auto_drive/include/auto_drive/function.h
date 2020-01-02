@@ -17,10 +17,32 @@ typedef struct
 	float maxOffset_left;
 	float maxOffset_right;
 }gpsMsg_t;
+//闲暇时间对此结构体进行修改，此为路径点信息，并非gps信息
 
+typedef struct
+{
+	bool flag; // invalid ?
+	float roadwheel_angle;
+	float speed;
+	float brake;
+}controlMsg_t;
+
+typedef struct
+{
+	std::vector<gpsMsg_t> points;
+	float resolution; //分辨率,即路径点间的间距
+	void clear()
+	{
+		points.clear();
+	}
+	size_t size()
+	{
+		return points.size();
+	}
+}path_t;
 
 inline bool calculateDis2path(const double& X_,const double& Y_, //point corrdinate
-						 const std::vector<gpsMsg_t>& path_points, //path points
+						 const path_t & path, //path
 						 const size_t& target_point_index, //the reference point index
 						 size_t& nearest_point_index,
 						 float& distance)                  //distance between point and path
@@ -30,29 +52,29 @@ inline bool calculateDis2path(const double& X_,const double& Y_, //point corrdin
 		nearest_point_index = 0;
 	
 		//the direction of side c 
-		//float yaw_of_c = (path_points[first_point_index].yaw + path_points[second_point_index].yaw)/2;
-		float yaw_of_c = atan2(path_points[1].x-path_points[0].x, path_points[1].y-path_points[0].y);
+		//float yaw_of_c = (path.points[first_point_index].yaw + path.points[second_point_index].yaw)/2;
+		float yaw_of_c = atan2(path.points[1].x-path.points[0].x, path.points[1].y-path.points[0].y);
 	
 		//object : world coordination to local coordination
-		float x = (X_-path_points[0].x) * cos(yaw_of_c) - (Y_-path_points[0].y) * sin(yaw_of_c);
-		//float y = (X_-path_points[first_point_index].x) * sin(yaw_of_c) + (Y_-path_points[first_point_index].y) * cos(yaw_of_c);
+		float x = (X_-path.points[0].x) * cos(yaw_of_c) - (Y_-path.points[0].y) * sin(yaw_of_c);
+		//float y = (X_-path.points[first_point_index].x) * sin(yaw_of_c) + (Y_-path.points[first_point_index].y) * cos(yaw_of_c);
 	    distance = x;
 		return true;
 	}
 	
-	//ROS_INFO("path_points.size:%d\t target_point_index:%d",path_points.size(),target_point_index);
+	//ROS_INFO("path.points.size:%d\t target_point_index:%d",path.points.size(),target_point_index);
 	
 	//this target is tracking target,
 	//let the target points as the starting point of index
 	//Judging whether to index downward or upward
-	float dis2target = pow(path_points[target_point_index].x - X_, 2) + 
-					   pow(path_points[target_point_index].y - Y_, 2) ;
+	float dis2target = pow(path.points[target_point_index].x - X_, 2) + 
+					   pow(path.points[target_point_index].y - Y_, 2) ;
 	
-	float dis2next_target = pow(path_points[target_point_index+1].x - X_, 2) + 
-							pow(path_points[target_point_index+1].y - Y_, 2) ;
+	float dis2next_target = pow(path.points[target_point_index+1].x - X_, 2) + 
+							pow(path.points[target_point_index+1].y - Y_, 2) ;
 							
-	float dis2last_target = pow(path_points[target_point_index-1].x - X_, 2) + 
-					        pow(path_points[target_point_index-1].y - Y_, 2) ;
+	float dis2last_target = pow(path.points[target_point_index-1].x - X_, 2) + 
+					        pow(path.points[target_point_index-1].y - Y_, 2) ;
 	
 	//std::cout << sqrt(dis2target)<<"\t"<< sqrt(dis2next_target) <<"\t"<< sqrt(dis2last_target) << std::endl;
 	
@@ -80,8 +102,8 @@ inline bool calculateDis2path(const double& X_,const double& Y_, //point corrdin
 			}
 		/*   prevent size_t index 0-1 data overflow    */
 			
-			second_dis = pow(path_points[second_point_index].x - X_, 2) + 
-						 pow(path_points[second_point_index].y - Y_, 2) ;
+			second_dis = pow(path.points[second_point_index].x - X_, 2) + 
+						 pow(path.points[second_point_index].y - Y_, 2) ;
 			
 			if(second_dis < first_dis) //continue 
 			{
@@ -97,15 +119,15 @@ inline bool calculateDis2path(const double& X_,const double& Y_, //point corrdin
 		for(size_t i=1;true;i++)
 		{
 			second_point_index = target_point_index + i;
-			if(second_point_index >= path_points.size())
+			if(second_point_index >= path.points.size())
 			{
 				// distance = 0.0;
 				// nearest_point_index = 0;
 				return false;
 			}
 			
-			second_dis = pow(path_points[second_point_index].x - X_, 2) + 
-						 pow(path_points[second_point_index].y - Y_, 2) ;
+			second_dis = pow(path.points[second_point_index].x - X_, 2) + 
+						 pow(path.points[second_point_index].y - Y_, 2) ;
 
 			if(second_dis < first_dis) //continue
 			{
@@ -128,13 +150,13 @@ inline bool calculateDis2path(const double& X_,const double& Y_, //point corrdin
 	nearest_point_index = (first_point_index+second_point_index)/2;
 	
 	//the direction of side c
-	//float yaw_of_c = (path_points[first_point_index].yaw + path_points[second_point_index].yaw)/2;
-	float yaw_of_c = is_yawReverse*M_PI + atan2(path_points[second_point_index].x-path_points[first_point_index].x,
-									   path_points[second_point_index].y-path_points[first_point_index].y);
+	//float yaw_of_c = (path.points[first_point_index].yaw + path.points[second_point_index].yaw)/2;
+	float yaw_of_c = is_yawReverse*M_PI + atan2(path.points[second_point_index].x-path.points[first_point_index].x,
+									   path.points[second_point_index].y-path.points[first_point_index].y);
 				
 	//object : world coordination to local coordination
-	float x = (X_-path_points[first_point_index].x) * cos(yaw_of_c) - (Y_-path_points[first_point_index].y) * sin(yaw_of_c);
-	//float y = (X_-path_points[first_point_index].x) * sin(yaw_of_c) + (Y_-path_points[first_point_index].y) * cos(yaw_of_c);
+	float x = (X_-path.points[first_point_index].x) * cos(yaw_of_c) - (Y_-path.points[first_point_index].y) * sin(yaw_of_c);
+	//float y = (X_-path.points[first_point_index].x) * sin(yaw_of_c) + (Y_-path.points[first_point_index].y) * cos(yaw_of_c);
 	
 	//ROS_ERROR("index1:%d\t index2:%d",first_point_index,second_point_index);
 
@@ -173,17 +195,17 @@ inline std::pair<float, float> get_dis_yaw(const gpsMsg_t &point1, const gpsMsg_
 	return dis_yaw;
 }
 
-inline int findNearestPoint(const std::vector<gpsMsg_t>& path_points, const gpsMsg_t& current_point)
+inline int findNearestPoint(const path_t& path, const gpsMsg_t& current_point)
 {
 	int index = 0;
 	float min_dis = FLT_MAX;
 	float dis;
 	
-	for(size_t i=0; i<path_points.size(); )
+	for(size_t i=0; i<path.points.size(); )
 	{
-		dis = dis2Points(path_points[i],current_point,true);
+		dis = dis2Points(path.points[i],current_point,true);
 		// printf("i=%d\t dis:%f\n",i,dis);
-		// printf("path_points[%d] x:%lf\t y:%lf\n",i,path_points[i].x,path_points[i].y);
+		// printf("path.points[%d] x:%lf\t y:%lf\n",i,path.points[i].x,path.points[i].y);
 		// printf("current_point  x:%lf\t y:%lf\n",current_point.x,current_point.y);
 		if(dis < min_dis)
 		{
@@ -217,7 +239,7 @@ inline float generateRoadwheelAngleByRadius(const float& radius, const float& wh
 	return atan(wheel_base/radius)*180/M_PI;    //correct algorithm 
 }
 
-inline bool loadPathPoints(std::string file_path,std::vector<gpsMsg_t>& points)
+inline bool loadPath(std::string file_path, path_t& path)
 {
 	
 	FILE *fp = fopen(file_path.c_str(),"r");
@@ -233,14 +255,16 @@ inline bool loadPathPoints(std::string file_path,std::vector<gpsMsg_t>& points)
 	while(!feof(fp))
 	{
 		fscanf(fp,"%lf\t%lf\t%lf\n",&point.x,&point.y,&point.yaw);
-		points.push_back(point);
+		path.points.push_back(point);
 	}
+	path.resolution = 0.1; //应从文件载入
 	fclose(fp);
 	return true;
 }
 
-inline bool generatePathByVertexes(const std::vector<gpsMsg_t>& vertexes,std::vector<gpsMsg_t>& pathPoints,float increment)
+inline bool generatePathByVertexes(const path_t& vertex_path, path_t& path,float increment)
 {
+	const std::vector<gpsMsg_t>& vertexes = vertex_path.points;
 	if(vertexes.size()<2)
 		return false;
 	gpsMsg_t startPoint = vertexes[0];
@@ -259,7 +283,7 @@ inline bool generatePathByVertexes(const std::vector<gpsMsg_t>& vertexes,std::ve
 			gpsMsg_t now;
 			now.x = startPoint.x + x_increment*j;
 			now.y = startPoint.y + y_increment*j;
-			pathPoints.push_back(now);
+			path.points.push_back(now);
 		}
 	}
 	return true;
