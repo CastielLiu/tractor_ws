@@ -40,7 +40,7 @@ bool AutoDrive::init()
 	sub_utm_ = nh_.subscribe("/ll2utm",1,&AutoDrive::odom_callback,this);
 
 	// wait for system ok
-	while(ros::ok() && !is_gps_data_valid(current_point_))
+	while(ros::ok() && !is_gps_data_valid(vehicle_point_))
 	{
 		ROS_INFO("[AutoDrive]: gps data is invalid, please check the gps topic or waiting...");
 		sleep(0.5);
@@ -117,7 +117,7 @@ void AutoDrive::autoDriveThread(const fs::path& file, float speed)
 	{
 		path_t vertex_path;
 		loadPath(file_name,vertex_path);
-		generatePathByVertexes(vertex_path, path_.points, 0.1);
+		generatePathByVertexes(vertex_path, path_, 0.1);
 		ROS_INFO("VertexTracking__path points size:%lu",path_.points.size());
 	}
 	
@@ -125,7 +125,7 @@ void AutoDrive::autoDriveThread(const fs::path& file, float speed)
 	
 	//配置路径跟踪控制器
 	this->tracker_.setPath(path_);
-    if(!tracker_.init(current_point_))
+    if(!tracker_.init(vehicle_point_))
         return;
 	//配置避障控制器
 	avoider_.setPath(path_);
@@ -140,7 +140,7 @@ void AutoDrive::autoDriveThread(const fs::path& file, float speed)
 			continue;
 		else if(status_ == TrackerStop)
 			break;
-		bool update_state = tracker_.update(vehicle_speed_, roadwheel_angle_, current_point_, avoid_offset_);
+		bool update_state = tracker_.update(vehicle_speed_, roadwheel_angle_, vehicle_point_, avoid_offset_);
         if(update_state == 0)
         {
             usleep(0.01);
@@ -197,12 +197,12 @@ void AutoDrive::timer_callback(const ros::TimerEvent&)
 
 void AutoDrive::odom_callback(const nav_msgs::Odometry::ConstPtr& msg)
 {
-	current_point_.x = msg->pose.pose.position.x;
-	current_point_.y = msg->pose.pose.position.y;
-	current_point_.yaw = msg->pose.covariance[0];
+	vehicle_point_.x = msg->pose.pose.position.x;
+	vehicle_point_.y = msg->pose.pose.position.y;
+	vehicle_point_.yaw = msg->pose.covariance[0];
 	
-	current_point_.longitude = msg->pose.covariance[1];
-	current_point_.latitude = msg->pose.covariance[2];
+	vehicle_point_.longitude = msg->pose.covariance[1];
+	vehicle_point_.latitude = msg->pose.covariance[2];
 }
 
 int main(int argc, char *argv[])

@@ -10,7 +10,7 @@ PathTracking::~PathTracking()
 {
 }
 
-bool PathTracking::init(const gpsMsg_t& current_point)
+bool PathTracking::init(const gpsMsg_t& vehicle_point)
 {
 	pub_info_ = nh_.advertise<driverless_msgs::PathTrackingInfo>("/path_tracking_info",1);
 
@@ -26,7 +26,7 @@ bool PathTracking::init(const gpsMsg_t& current_point)
 		return false;
 	}
 
-	nearest_point_index_ = findNearestPoint(path_, current_point);
+	nearest_point_index_ = findNearestPoint(path_, vehicle_point);
 	if(nearest_point_index_ <0)
 		return false;
 
@@ -38,7 +38,7 @@ bool PathTracking::init(const gpsMsg_t& current_point)
 // 1 update ok
 // 2 path_tracking over
 int PathTracking::update(float speed, float road_wheelangle,  //vehicle state
-						 const gpsMsg_t& current_point,      //vehicle positoin
+						 const gpsMsg_t& vehicle_point,      //vehicle positoin
 						 const float& path_offset)
 {
 	vehicle_speed_ = speed;
@@ -47,7 +47,7 @@ int PathTracking::update(float speed, float road_wheelangle,  //vehicle state
 	static int cnt = 0;
 	target_point_ = path_.points[target_point_index_];
 	
-	bool ok = calculateDis2path(current_point.x, current_point.y, path_, target_point_index_, //input
+	bool ok = calculateDis2path(vehicle_point.x, vehicle_point.y, path_, target_point_index_, //input
 					            nearest_point_index_, lateral_err_); //output
 	// lateral_err_ = lateral_err_ - path_offset; 
 	if(!ok) //path points track over
@@ -58,14 +58,14 @@ int PathTracking::update(float speed, float road_wheelangle,  //vehicle state
 	if( path_offset != 0.0)
 		target_point_ = pointOffset(target_point_, path_offset);
 
-	std::pair<float, float> dis_yaw = get_dis_yaw(target_point_, current_point);
+	std::pair<float, float> dis_yaw = get_dis_yaw(target_point_, vehicle_point);
 
 	if( dis_yaw.first < disThreshold_)
 	{
 		++target_point_index_;
 		
 	}
-	float yaw_err = dis_yaw.second - current_point.yaw;
+	float yaw_err = dis_yaw.second - vehicle_point.yaw;
 	
 	if(yaw_err==0.0)
 		return 0;

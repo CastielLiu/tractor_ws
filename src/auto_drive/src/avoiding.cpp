@@ -81,19 +81,19 @@ controlMsg_t Avoiding::getControlMsg()
  * @brief 更新车辆状态信息
  * @param speed                 车速
  * @param road_wheelangle       前轮转角
- * @param current_point    		车辆位置
+ * @param vehicle_point    		车辆位置
  * @param nearest_point_index 	距离路径最近点的索引
  * 
  * @return 是否更新成功
  */
-bool Avoiding::update(float speed, float road_wheelangle, const gpsMsg_t& current_point, size_t nearest_point_index)
+bool Avoiding::update(float speed, float road_wheelangle, const gpsMsg_t& vehicle_point, size_t nearest_point_index)
 {
 	if(!is_running_)
 		return false;
     road_wheelangle_ = road_wheelangle;
     vehicle_speed_ = speed;
 	nearest_point_index_ = nearest_point_index;
-    current_point_ = current_point;
+    vehicle_pose_ = vehicle_point;
 	return true;
 }
 
@@ -103,7 +103,7 @@ bool Avoiding::update(float speed, float road_wheelangle, const gpsMsg_t& curren
  * @param objects   	  输出：自定义object集合
  */
 void Avoiding::objMsgs2obj(const jsk_recognition_msgs::BoundingBoxArray::ConstPtr& msgs,
-						   const std::vector<object_t>& objects)
+						   std::vector<object_t>& objects)
 {
 	size_t n_object = msgs->boxes.size();
 	for(int i=0; i<n_object; ++i)
@@ -137,11 +137,11 @@ void Avoiding::objects_callback(const jsk_recognition_msgs::BoundingBoxArray::Co
 	objMsgs2obj(msgs, objects);
 
 	float forsight_distance = 10.0; //避障前视距离
-	size_t start_index = current_point_index_;
-	size_t end_index = current_point_index_ + forsight_distance/path_.resolution;
+	size_t start_index = nearest_point_index_;
+	size_t end_index = nearest_point_index_ + forsight_distance/path_.resolution;
 	if(end_index >= path_.points.size())
 	{
-		ROS_INFO("[Avoiding]: the remaind path points is not enough!")
+		ROS_INFO("[Avoiding]: the remaind path points is not enough!");
 		this->shutDown();
 		return ;
 	}
@@ -150,11 +150,11 @@ void Avoiding::objects_callback(const jsk_recognition_msgs::BoundingBoxArray::Co
 	
 	std::vector<pose_t> raw_path_points(points_cnt);//原始路径片段在车体坐标系下的坐标 
 	std::vector<pose_t> now_path_points(points_cnt);//当前路径片段在车体坐标系下的坐标
-	pose_t vehicle_pose = current_point_;
+
 	for(int i=0; i<points_cnt; ++i)
 	{
 		pose_t pose_in_earth = path_.points[i];
-		now_path_points[i] = raw_path_points[i] = transform(pose_in_earth, vehicle_pose);
+		now_path_points[i] = raw_path_points[i] = transform(pose_in_earth, vehicle_pose_);
 		if(avoiding_offest_)
 			now_path_points[i].offsetInPlace(avoiding_offest_); 
 	}
@@ -164,15 +164,15 @@ void Avoiding::objects_callback(const jsk_recognition_msgs::BoundingBoxArray::Co
 	
 	if(obstacles.size() ==0)
 	{
-		std::lock_guard<std::mutex> lc(control_msg_mutex_);
+		std::lock_guard<std::mutex> lock1(control_msg_mutex_);
 		control_msg_.flag = false;
 		if(avoiding_offest_==0.0)
 			return;
-		//位于避障路径，尝试返回原路径
+		//当前位于避障路径，且没有障碍物，尝试返回原路径
 		bool ok = tryToReturnOriginPath(objects, raw_path_points); 
 		if(!ok)
 			return;
-		std::lock_guard<std::mutex> lc(avoiding_offest_mutex_);
+		std::lock_guard<std::mutex> lock2(avoiding_offest_mutex_);
 		avoiding_offest_ = 0.0;
 		return ;
 	} 
@@ -187,8 +187,8 @@ void Avoiding::objects_callback(const jsk_recognition_msgs::BoundingBoxArray::Co
 		return ;
 	}
 
-	float offset_left = tryOffset(objects, sorted_obstacles, raw_path_points, avoiding_offest_，-1);
-	float offset_right= tryOffset(objects, sorted_obstacles, raw_path_points, avoiding_offest_， 1);
+	float offset_left = tryOffset(objects, sorted_obstacles, raw_path_points, avoiding_offest_, -1);
+	float offset_right= tryOffset(objects, sorted_obstacles, raw_path_points, avoiding_offest_,  1);
 
 	if(offset_left == offset_right ) //all 0
 	{
@@ -203,6 +203,23 @@ void Avoiding::objects_callback(const jsk_recognition_msgs::BoundingBoxArray::Co
 	else 
 		avoiding_offest_ += offset_left;
 	   
+}
+
+/** 
+ * @brief 尝试返回原路径 (当前处于避障路径，且当前没有障碍物)
+ * @param objects            所有目标
+ * @param origin_path_points 原始路径点
+ * 
+ * @return 是否可以返回原路径
+ */
+bool Avoiding::tryToReturnOriginPath(std::vector<object_t>& objects,
+									 const std::vector<pose_t>& origin_path_points)
+{
+	std::vector<object_t> obstacles;
+	objectClassify(objects, origin_path_points, obstacles);
+	if(obstacles.size()==0)
+		return true;
+	return false;
 }
 
 /** 
@@ -246,7 +263,7 @@ float Avoiding::tryOffset(std::vector<object_t>& objects,
 	if(now_obstacles.size() ==0 )
 		return try_offset;
 	std::vector<object_t*> now_sorted_obstacles = sortObstacle(now_obstacles);
-	float offset = tryOffset(objects, now_sorted_obstacles, origin_path_points，try_offset+old_offset, dir);
+	float offset = tryOffset(objects, now_sorted_obstacles, origin_path_points, try_offset+old_offset, dir);
 	try_offset += offset;
 	if(offset == 0.0)
 		return 0.0;
@@ -274,11 +291,10 @@ inline void Avoiding::offsetPathPoints(std::vector<pose_t>& points, float offset
  *  
  * @return
  */
-void Avoiding::objectClassify(std::vector<object_t>& objects, std::vector<pose_t>& now_path_points,
+void Avoiding::objectClassify(std::vector<object_t>& objects, const std::vector<pose_t>& now_path_points,
 							  std::vector<object_t>& obstacles)
 {
 	obstacles.clear();
-	other_objects.clear();
 	size_t n_object = objects.size();
 	size_t n_path_points = now_path_points.size();
 	//判断各目标是否为障碍物
@@ -286,10 +302,10 @@ void Avoiding::objectClassify(std::vector<object_t>& objects, std::vector<pose_t
 	{
 		//在此之前已经被认定为"可能"的障碍物，跳过
 		//所谓“可能”，即并非阻碍了当前路径，可能阻碍之前提出的路径或者原路径
-		if(objects.is_obstacle)
+		if(object.is_obstacle)
 			continue;
-		// objects[i].inners.clear();
-		const pose_t& object_pose = objects.rect.pose;
+		// object.inners.clear();
+		const pose_t& object_pose = object.rect.pose;
 		for(int j=0; j<n_path_points; ++j)
 		{
 			pose_t local_pose = transform(now_path_points[j], object_pose);
@@ -298,12 +314,7 @@ void Avoiding::objectClassify(std::vector<object_t>& objects, std::vector<pose_t
 				continue;
 			object.inners.push_back(now_path_points[j]);
 		}
-		if(object.inners.size()==0)
-		{
-			object.is_obstacle = false;
-			other_objects.push_back(object);
-		}
-		else
+		if(object.inners.size()!=0)
 		{
 			object.is_obstacle = true;
 			object.obstacle_distance = object.inners[0].y;
@@ -328,7 +339,7 @@ void Avoiding::bubbleSort(std::vector<object_t *>& obstacles, size_t length)
             if (obstacles[j]->obstacle_distance > obstacles[j+1]->obstacle_distance)
 			{
 				auto temp = obstacles[j];
-				indobstaclesex[j] = obstacles[j + 1];
+				obstacles[j] = obstacles[j + 1];
 				obstacles[j + 1] = temp;
 			}
         }

@@ -38,7 +38,7 @@ typedef struct Object
       right_offset = obj.right_offset;
       obstacle_distance = obj.obstacle_distance;
     }
-    Object operator=(const Object& obj)
+    Object& operator=(const Object& obj)
     {
       return Object(obj);
     }
@@ -55,16 +55,8 @@ typedef struct Object
         line.yaw = (inners[0].yaw + inners[size-1].yaw)/2;
 
       //step2: 求直线最两侧的矩形顶点到直线的距离
-      if(rect.yaw<=0) //矩形为顺时针旋转，最左/右侧顶点分别位于三、一象限
-      {
-        left_offset = distance(rect.vertexes[2], line);
-        right_offset = distance(rect.vertexes[0], line);
-      }
-      else //矩形为逆时针旋转，最左/右侧顶点分别位于二、四象限
-      {
-        left_offset = distance(rect.vertexes[1], line);
-        right_offset = distance(rect.vertexes[3], line);
-      }
+      left_offset = distance(rect.vertexes[1], line);
+      right_offset = distance(rect.vertexes[3], line);
     }
     
 }object_t;
@@ -79,18 +71,19 @@ class Avoiding
     void setPath(const path_t& path);
     float getAvoidOffset();
     controlMsg_t getControlMsg();
-    bool update(float speed, float road_wheelangle, const gpsMsg_t& current_point,
-			          size_t nearest_point_index);
+    bool update(float speed, float road_wheelangle, const pose_t& vehicle_pose, size_t nearest_point_index);
     void objMsgs2obj(const jsk_recognition_msgs::BoundingBoxArray::ConstPtr& msgs,
-						         const std::vector<object_t>& msgs)；
+						         std::vector<object_t>& objects);
     void objects_callback(const jsk_recognition_msgs::BoundingBoxArray::ConstPtr& objects);
+    bool tryToReturnOriginPath(std::vector<object_t>& objects,
+								            	 const std::vector<pose_t>& origin_path_points);
     float tryOffset(std::vector<object_t>& objects, 
                     const std::vector<object_t*>& sorted_obstacles,
                     const std::vector<pose_t>& origin_path_points,
                     float old_offset,
                     int dir);
     inline void offsetPathPoints(std::vector<pose_t>& points, float offset);
-    void objectClassify(std::vector<object_t>& objects, std::vector<pose_t>& now_path_points,
+    void objectClassify(std::vector<object_t>& objects, const std::vector<pose_t>& now_path_points,
 							          std::vector<object_t>& obstacles);
     void bubbleSort(std::vector<object_t *>& obstacles, size_t length);
     std::vector<object_t*> sortObstacle(std::vector<object_t>& obstacles);
@@ -124,7 +117,8 @@ class Avoiding
     size_t target_point_index_;
     size_t nearest_point_index_;
 
-    gpsMsg_t current_point_,target_point_;
+    gpsMsg_t target_point_;
+    pose_t vehicle_pose_;
 
     float maxOffset_right_, maxOffset_left_;
 

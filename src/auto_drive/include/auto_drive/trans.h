@@ -1,7 +1,8 @@
 #ifndef TRANS_H_
 #define TRANS_H_
+
 #include<cmath>
-#include<function.h>
+#include"function.h"
 #include<iostream>
 
 /** 
@@ -88,10 +89,10 @@ typedef struct Rect
     //按照象限存放
     std::vector<position_t> vertexes; 
 
-    Rect(){vertexes.resize(4);}
+    Rect(){}
+
     Rect(float _x,float _y, float _yaw, float _x_len, float _y_len)
     {
-        vertexes.resize(4);
         pose.x = _x;
         pose.y = _y;
         pose.yaw = _yaw;
@@ -100,7 +101,6 @@ typedef struct Rect
     }
     Rect(pose_t& _pose, float _x_len, float _y_len)
     {
-        vertexes.resize(4);
         pose = _pose;
         x_len = _x_len;
         y_len = _y_len;
@@ -113,6 +113,7 @@ typedef struct Rect
 
     void calVertexes()
     {
+        vertexes.resize(4);
         vertexes[0].x = x_len/2;
         vertexes[0].y = y_len/2;
         
@@ -128,6 +129,7 @@ typedef struct Rect
    
     
 }rect_t;
+
 
 /** 
  * @brief 全局坐标转换到局部坐标
