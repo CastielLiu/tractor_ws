@@ -81,19 +81,19 @@ controlMsg_t Avoiding::getControlMsg()
  * @brief 更新车辆状态信息
  * @param speed                 车速
  * @param road_wheelangle       前轮转角
- * @param vehicle_point    		车辆位置
+ * @param vehicle_pose    		车辆位置
  * @param nearest_point_index 	距离路径最近点的索引
  * 
  * @return 是否更新成功
  */
-bool Avoiding::update(float speed, float road_wheelangle, const gpsMsg_t& vehicle_point, size_t nearest_point_index)
+bool Avoiding::update(float speed, float road_wheelangle, const pose_t& vehicle_pose, size_t nearest_point_index)
 {
 	if(!is_running_)
 		return false;
     road_wheelangle_ = road_wheelangle;
     vehicle_speed_ = speed;
 	nearest_point_index_ = nearest_point_index;
-    vehicle_pose_ = vehicle_point;
+    vehicle_pose_ = vehicle_pose;
 	return true;
 }
 

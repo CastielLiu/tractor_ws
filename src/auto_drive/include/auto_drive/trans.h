@@ -26,6 +26,7 @@ typedef struct Pose
         y = point.y;
         yaw = - point.yaw;
     }
+    
     void print(const std::string& info = "pose")
     {
         std::cout << info << ": (" << x << "," << y << "," << yaw*180.0/M_PI <<"deg)" << std::endl;

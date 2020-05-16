@@ -27,7 +27,7 @@ class AutoDrive
 	float vehicle_speed_;
 	float roadwheel_angle_;
 	float max_roadwheelAngle_;
-    gpsMsg_t current_point_;
+    gpsMsg_t vehicle_point_;
     std::string path_file_dir_;
     path_t path_;
 

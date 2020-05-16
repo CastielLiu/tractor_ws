@@ -40,7 +40,16 @@ typedef struct Object
     }
     Object& operator=(const Object& obj)
     {
-      return Object(obj);
+      if(&obj == this)
+        return *this;
+      
+      rect = obj.rect;
+      is_obstacle = obj.is_obstacle;
+      left_offset = obj.left_offset;
+      right_offset = obj.right_offset;
+      obstacle_distance = obj.obstacle_distance;
+
+      return *this;
     }
     
     void calOffset() //right_offset和left_offset

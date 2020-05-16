@@ -18,7 +18,7 @@ typedef struct
 	float maxOffset_left;
 	float maxOffset_right;
 }gpsMsg_t;
-//闲暇时间对此结构体进行修改，此为路径点信息，并非gps信息
+//对此结构体进行修改，此为路径点信息，并非gps信息
 
 typedef struct
 {
