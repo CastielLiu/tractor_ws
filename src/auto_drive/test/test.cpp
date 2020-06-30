@@ -1,7 +1,27 @@
-#include<trans.h>
+//#include "../include/auto_drive/trans.h"
 #include<iostream>
 #include<cmath>
 using namespace std;
+
+class Test
+{
+public:
+	Test()
+	{
+		status_ = false;
+	}
+	bool status() const
+	{
+		return status_;
+	}
+private:
+	bool status_;
+};
+
+void fun(const Test& test)
+{
+	cout << test.status() << endl;
+}
 
 //position_t transform(const position_t& global_position, const pose_t& coordinate_pose);
 
@@ -31,7 +51,10 @@ int main()
 //	
 //	cout << distance(point, line)<< endl;;
 	
-	pose_t pose={3,3,90.0/180.0*M_PI};
-	pose.offset(-1.0).print();
+	//pose_t pose={3,3,90.0/180.0*M_PI};
+	//pose.offset(-1.0).print();
+	
+	Test test;
+	fun(test);
 }
 

@@ -1,9 +1,15 @@
 #include "auto_drive/path_tracking.h"
 
+/* path tracking module for intelligent tractor
+ * author: liushuaipeng, southeast university
+ * email:  castiel_liu@outlook.com
+ */
+
 PathTracking::PathTracking(const ros::NodeHandle& nh, const ros::NodeHandle& nh_private):
 	nh_(nh),
     nh_private_(nh_private)
 {
+	is_running_ = false;
 }
 
 PathTracking::~PathTracking()
@@ -47,12 +53,11 @@ int PathTracking::update(float speed, float road_wheelangle,  //vehicle state
 	static int cnt = 0;
 	target_point_ = path_.points[target_point_index_];
 	
-	bool ok = calculateDis2path(vehicle_point.x, vehicle_point.y, path_, target_point_index_, //input
-					            nearest_point_index_, lateral_err_); //output
+	lateral_err_ = calculateDis2path(vehicle_point.x, vehicle_point.y, path_, nearest_point_index_, //input
+					            nearest_point_index_); //output
 	// lateral_err_ = lateral_err_ - path_offset; 
-	if(!ok) //path points track over
-		return 2;
-	
+	//添加退出条件！！
+
 	disThreshold_ = foreSightDis_latErrCoefficient_ * fabs(lateral_err_) + min_foresight_distance_; 
 
 	if( path_offset != 0.0)

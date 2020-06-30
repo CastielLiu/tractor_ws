@@ -213,7 +213,6 @@ float generateRoadwheelAngleByRadius(const float& radius, const float& wheel_bas
 
 bool loadPathPoints(std::string file_path,std::vector<gpsMsg_t>& points)
 {
-	
 	FILE *fp = fopen(file_path.c_str(),"r");
 	
 	if(fp==NULL)

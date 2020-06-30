@@ -3,6 +3,7 @@
 	<node name="record_path_node" pkg="record_path" type="record_path_node" output="screen">
 		<param name="file_path" value="$(find record_path)/data/"/>
 		<param name="sample_distance" value="0.1"/>
+		<param name="utm_topic" value="/ll2utm" />
 	</node>
 
 

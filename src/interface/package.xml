@@ -4,9 +4,9 @@
   <version>0.0.0</version>
   <description>The interface package</description>
 
-  <maintainer email="wendao@todo.todo">wendao</maintainer>
-
+  <maintainer email="castiel_liu@outlook.com">liu shuaipeng</maintainer>
   <license>TODO</license>
+  <author email="castiel_liu@outlook.com">liu shuaipeng</author> 
 
   <buildtool_depend>catkin</buildtool_depend>
   <build_depend>can2serial</build_depend>

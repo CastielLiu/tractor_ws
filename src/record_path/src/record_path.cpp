@@ -1,9 +1,11 @@
-#include<ros/ros.h>
+#include <ros/ros.h>
 #include <unistd.h>
-#include<cmath>
-#include<nav_msgs/Odometry.h>
-#include<interface/RecordPath.h>
-#include<path_tracking/function.h>
+#include <cmath>
+#include <nav_msgs/Odometry.h>
+#include <interface/RecordPath.h>
+#include "auto_drive/function.h"
+
+#define __NAME__ "record_path"
 
 #ifndef PI_
 #define PI_ 3.141592653589
@@ -14,11 +16,14 @@
 #define CurveRecording 2
 #define VertexRecording 3
 
-
 /*recod path response*/
 #define Success 0
 #define Fail    1
 
+/* record path node for intelligent tractor
+ * author: liushuaipeng, southeast university
+ * email:  castiel_liu@outlook.com
+ */
 
 class Recorder
 {
@@ -65,18 +70,25 @@ bool Recorder::init()
 	
 	private_nh.param<std::string>("file_path",file_path_,"");
 	private_nh.param<float>("sample_distance",sample_distance_,0.1);
+	std::string utm_topic = private_nh.param<std::string>("utm_topic","");
 	
-	if(file_path_.empty())
+	if(utm_topic.empty())
 	{
-		ROS_ERROR("please input record file path and file name in launch file!!!");
+		ROS_ERROR("[%s] Please input utm_topic in launch file!", __NAME__);
 		return false;
 	}
 	
+	if(file_path_.empty())
+	{
+		ROS_ERROR("[%s] Please input record file path in launch file!", __NAME__);
+		return false;
+	}
+	
+	//创建服务,用于外部触发记录路径
 	srv_record_path_ = nh.advertiseService("record_path_service",&Recorder::recordPathService,this);
 	
-	sub_utm_ = nh.subscribe("/ll2utm",1,&Recorder::odom_callback,this);
-
-
+	sub_utm_ = nh.subscribe(utm_topic, 1, &Recorder::odom_callback,this);
+	
 	return true;
 }
 
@@ -89,29 +101,45 @@ bool Recorder::recordPathService(interface::RecordPath::Request  &req,
 		res.success = Fail;
 		return true;
 	}
+	//请求开始记录
 	if(req.command_type == req.START_RECORD_PATH )
 	{
-		if(this->status_ == CurveRecording || this->status_ == VertexRecording)
+		//已经处于记录状态,直接返回请求成功,不能作为重复请求或错误处理
+		//客户端请求记录后,服务器回传请求成功指令,然后客户端跳转到开始记录界面
+		//若长时间没有收到服务器回应,客户端超时返回
+		//考虑传输错误等原因,服务器已经接收请求并回应,但客户端未成功接收的问题
+		//待客户端再次请求记录时，返回正确标志,以使得客户端页面正常跳转.
+		if((req.path_type ==req.CURVE_TYPE && this->status_ == CurveRecording) ||
+			(req.path_type ==req.VERTEX_TYPE && this->status_ == VertexRecording))
 		{
 			res.success = Success;
 			return true;
 		}
 		
-		ROS_INFO("command: START_RECORD_PATH");
+		//当前处于记录状态,但新请求记录方法与当前状态不符
+		//关闭正在记录的文件,并将状态复位
+		if(this->status_ == CurveRecording || this->status_ == VertexRecording)
+		{
+			fclose(fp_);
+			fp_ = NULL;
+			this->status_ = RecorderIdle;
+		}
+		
 		if(req.path_type ==req.CURVE_TYPE)
 		{
-			this->status_ = CurveRecording;
+			ROS_INFO("[%s] Request start record path: curve type.",__NAME__);
 			last_point = {0.0,0.0,0.0,0.0,0.0}; 
+			this->status_ = CurveRecording;
 		}
 		else if(req.path_type == req.VERTEX_TYPE)
 		{
+			ROS_INFO("[%s] Request start record path: vertex type.",__NAME__);
 			last_point = {0.0,0.0,0.0,0.0,0.0}; 
 			this->status_ = VertexRecording;
 		}
-			
 		else
 		{
-			ROS_ERROR("Expected path type error !");
+			ROS_ERROR("[%s] Expected path type error !",__NAME__);
 			res.success = Fail;
 			return true;
 		}
@@ -121,17 +149,20 @@ bool Recorder::recordPathService(interface::RecordPath::Request  &req,
 		fp_ = fopen(file.c_str(),"w");
 		if(fp_ == NULL)
 		{
-			ROS_ERROR("open %s failed!",file.c_str());
+			ROS_ERROR("[%s] Open %s failed!",__NAME__, file.c_str());
 			res.success = Fail;
 			return true;
 		}
 		else
-			ROS_INFO("New file: %s created.",file.c_str());
+			ROS_INFO("[%s] New path file: %s created.",__NAME__, file.c_str());
 	}
+	//请求记录当前点,仅对顶点型有效
 	else if(req.command_type == req.RECORD_CURRENT_POINT)
 	{
+		//若当前非顶点型记录中,大错误!
 		if(this->status_ != VertexRecording)
 		{
+			ROS_ERROR("[%s] Request record current point, but system is in vertex recording!",__NAME__);
 			res.success = Fail;
 			return true;
 		}
@@ -139,22 +170,31 @@ bool Recorder::recordPathService(interface::RecordPath::Request  &req,
 		
 		if(dis < 1.0)
 		{
+			ROS_ERROR("[%s] Request record current point, but too close to the previous point." __NAME__);
 			res.success = Fail;
 			return true;
 		}
-		ROS_INFO("RECORD_CURRENT_POINT: %.3f\t%.3f\t%.3f",current_point.x,current_point.y,current_point.yaw);
+		ROS_INFO("[%s] record current point: %.3f\t%.3f\t%.3f ok.",current_point.x,current_point.y,current_point.yaw*180.0/PI_);
 		fprintf(fp_,"%.3f\t%.3f\t%.3f\r\n",current_point.x,current_point.y,current_point.yaw);
 		fflush(fp_);
 		last_point = current_point;
 	}
+	//请求停止记录
 	else if(req.command_type == req.STOP_RECORD_PATH)
 	{
+		//当前已经处于空闲状态,但仍然需要返回成功标志,
+		//与请求记录时原理一致.
 		if(this->status_ == RecorderIdle)
 		{
 			res.success = Success;
+			if(fp_ != NULL)  //冗余判断
+			{
+				fclose(fp_);
+				fp_ = NULL;
+			}
 			return true;
 		}
-		ROS_INFO("RECORD_complete");
+		ROS_INFO("[%s] Record path completed.",__NAME__);
 		fclose(fp_);
 		fp_ = NULL;
 		this->status_ = RecorderIdle;
@@ -179,19 +219,27 @@ bool Recorder::is_location_ok()
 	return true;
 }
 
-
 void Recorder::odom_callback(const nav_msgs::Odometry::ConstPtr& msg)
 {
+	//自节点运行开始更新当前点信息
 	current_point.x = msg->pose.pose.position.x;
 	current_point.y = msg->pose.pose.position.y;
 	current_point.yaw = msg->pose.covariance[0];
 	
+	//如果为处于曲线记录状态, 直接返回
 	if(this->status_ != CurveRecording)
 		return;
 	
+	//验证文件是否可用
+	if(fp_ == NULL)
+	{
+		ROS_ERROR("[%s] system want to record curve path, buf the file is not open!", __NAME__);
+		return ;
+	}
+	
 	if(sample_distance_*sample_distance_ <= calculate_dis2(current_point,last_point))
 	{
-		printf("recoding: %.3f\t%.3f\t%.3f\r\n",current_point.x,current_point.y,current_point.yaw);
+		ROS_INFO("[%s] recoding: %.3f\t%.3f\t%.3f\r\n",__NAME__, current_point.x,current_point.y,current_point.yaw);
 		fprintf(fp_,"%.3f\t%.3f\t%.3f\r\n",current_point.x,current_point.y,current_point.yaw);
 		fflush(fp_);
 
@@ -202,12 +250,12 @@ void Recorder::odom_callback(const nav_msgs::Odometry::ConstPtr& msg)
 
 int main(int argc,char**argv)
 {
-	ros::init(argc,argv,"record_data_node");
+	ros::init(argc,argv,"record_path_node");
 	
 	Recorder recorder;
 	
 	if(!recorder.init())
-		return 1;
+		return 0;
 
 	ros::spin();
 	

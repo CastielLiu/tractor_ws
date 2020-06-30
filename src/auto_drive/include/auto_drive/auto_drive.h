@@ -15,7 +15,7 @@ class AutoDrive
     ~AutoDrive();
     bool init();
     void run();
-    void autoDriveThread(const fs::path& file, float speed);
+    void autoDriveThread(float speed);
     void odom_callback(const nav_msgs::Odometry::ConstPtr& msg);
     void timer_callback(const ros::TimerEvent&);
     bool driverlessService(interface::Driverless::Request  &req,

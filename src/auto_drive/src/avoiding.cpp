@@ -1,5 +1,10 @@
 #include"auto_drive/avoiding.h"
 
+/* avoiding module for intelligent tractor
+ * author: liushuaipeng, southeast university
+ * email:  castiel_liu@outlook.com
+ */
+
 Avoiding::Avoiding(const ros::NodeHandle& nh, const ros::NodeHandle& nh_private):
     nh_(nh),
     nh_private_(nh_private),

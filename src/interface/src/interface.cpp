@@ -1,6 +1,12 @@
 #include <ros/ros.h>
 #include <interface/interface.h>
 
+/* can bus information interface node for intelligent tractor
+ * author: liushuaipeng, southeast university
+ * email:  castiel_liu@outlook.com
+ */
+
+#define __NAME__ "interface"
 
 Interface::Interface():
 	odom_flag_(false),
@@ -12,6 +18,7 @@ Interface::Interface():
 Interface::~Interface()
 {
 	delete can2serial_;
+	can2serial_ = NULL;
 }
 
 bool Interface::init()
@@ -19,32 +26,44 @@ bool Interface::init()
 	ros::NodeHandle nh;
 	ros::NodeHandle nh_private("~");
 	
-	sub_gps_ = nh.subscribe("/ll2utm",1,&Interface::odom_callback,this);
+	std::string utm_topic = nh_private.param<std::string>("utm_topic","");
+	
+	if(utm_topic.empty())
+	{
+		ROS_ERROR("[%s] Please input utm_topic in launch file!", __NAME__);
+		return false;
+	}
+
+	sub_gps_ = nh.subscribe(utm_topic, 1,&Interface::odom_callback,this);
 
 	sub_pathtracking_info_ = 
 		nh.subscribe("/path_tracking_info",1,&Interface::path_tracking_info_callback, this);
 		
 	timer_ = nh.createTimer(ros::Duration(0.5), &Interface::timer_callback,this);
 	
+	//创建路径记录服务客户端
 	client_recordPath_ = nh.serviceClient<interface::RecordPath>("record_path_service");
+	//创建自动驾驶服务客户端
 	client_driverless_ = nh.serviceClient<interface::Driverless>("driverless_service");
+	//创建其他服务客户端
 	other_srv_nh_ = nh.advertiseService("other_service",&Interface::otherService, this);
 	
 	nh_private.param<std::string>("can2serial_port",can2serial_port_,"");
 	nh_private.param<int>("can_baudrate",can_baudrate_,250);
 	if(can2serial_port_.empty())
 	{
-		ROS_ERROR("please input can2serial_port!");
+		ROS_ERROR("[%s] Please input can2serial_port in launch file!", __NAME__);
 		return false;
 	}
 	
 	if(!can2serial_->configure_port(can2serial_port_))
+	{
+		ROS_ERROR("[%s] Configure can2serial failed!", __NAME__);
 		return false;
+	}
 	
 	can2serial_->configBaudrate(can_baudrate_);
-	
 	can2serial_->clearCanFilter();
-	
 	can2serial_->StartReading();
 	
 	return true;
@@ -75,31 +94,40 @@ void Interface::readCanMsg()
 		switch(can_msg.ID)
 		{
 			int file_seq;
-			case RECORD_PATH_CAN_ID:
+			case RECORD_PATH_CAN_ID: //记录路径can消息
 				file_seq = can_msg.data[1]*256 + can_msg.data[0];
 				srv_record_path_.request.path_type = can_msg.data[2];
-				srv_record_path_.request.path_file_name = std::to_string(file_seq)+"_"+ std::to_string(srv_record_path_.request.path_type)+".txt";
+				srv_record_path_.request.path_file_name = std::to_string(file_seq)+"_" 
+														+ std::to_string(srv_record_path_.request.path_type)+".txt";
 				srv_record_path_.request.command_type = can_msg.data[3];
-				ROS_INFO("request recod path: %s\ttype:%d\tcmd:%d",srv_record_path_.request.path_file_name.c_str(),srv_record_path_.request.path_type,srv_record_path_.request.command_type);
+				ROS_INFO("[%s] Request recod path: %s\ttype:%d\tcmd:%d",__NAME__, 
+									srv_record_path_.request.path_file_name.c_str(),
+									srv_record_path_.request.path_type,
+									srv_record_path_.request.command_type);
 				client_recordPath_.call(srv_record_path_);
 				can_msg_response.data[0] = 0x00;//response record path
 				can_msg_response.data[1] = srv_record_path_.response.success;
 				can2serial_->sendCanMsg(can_msg_response); //response
 				break;
-			case DRIVERLESS_CAN_ID:
+			case DRIVERLESS_CAN_ID://自动驾驶can消息
 				srv_driverless_.request.command_type = can_msg.data[3];
 				srv_driverless_.request.path_type = can_msg.data[2];
 				file_seq = can_msg.data[1]*256 + can_msg.data[0];
 				// seq_type.txt
-				srv_driverless_.request.path_file_name = std::to_string(file_seq)+"_"+ std::to_string(srv_driverless_.request.path_type)+".txt";
+				srv_driverless_.request.path_file_name = std::to_string(file_seq)+"_" 
+													   + std::to_string(srv_driverless_.request.path_type)+".txt";
 				srv_driverless_.request.speed = can_msg.data[4];
-				ROS_INFO("requestDriveless:%s\ttype:%d\tcmd:%d",srv_driverless_.request.path_file_name.c_str(),srv_driverless_.request.path_type,srv_driverless_.request.command_type);
+				ROS_INFO("[%s] Request auto drive:%s\ttype:%d\tcmd:%d",__NAME__,
+								 srv_driverless_.request.path_file_name.c_str(),
+								 srv_driverless_.request.path_type,
+								 srv_driverless_.request.command_type);
 				client_driverless_.call(srv_driverless_);
 				can_msg_response.data[0] = 0x01;//response driverless
 				can_msg_response.data[1] = srv_driverless_.response.success;
 				can2serial_->sendCanMsg(can_msg_response); //response
 				break;
 			default:
+				ROS_ERROR("[%s] Unkown can ID." __NAME__);
 				break;
 		}
 	}
@@ -112,7 +140,7 @@ void Interface::odom_callback(const nav_msgs::Odometry::ConstPtr& msg)
 	double latitude = msg->pose.covariance[2];
 	uint16_t height = msg->pose.pose.position.z * 10 + 2000;
 	
-	if(longitude > 0 && latitude >0 )
+	if(longitude > 0 && latitude >0)
 		odom_flag_ = true;
 	else
 		odom_flag_ = false;
@@ -159,7 +187,7 @@ void Interface::timer_callback(const ros::TimerEvent& event)
 		usleep(1000);
 	}
 	if(!tracking_info_flag_)
-	{
+	{	//若跟踪信息无效,横向偏差置0
 		uint16_t lateral_err = uint16_t(0.0*100) + 255;
 		info_.status.data[4] |= lateral_err%2 << 7;
 		info_.status.data[5] = lateral_err/2;

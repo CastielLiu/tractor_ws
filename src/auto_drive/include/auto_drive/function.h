@@ -1,168 +1,159 @@
 #ifndef FUNCTION_H_
 #define FUNCTION_H_
 
-#include<vector>
-#include<iostream>
-#include<cmath>
-#include<float.h>
-#include<assert.h>
+#include <vector>
+#include <iostream>
+#include <cmath>
+#include <float.h>
+#include <assert.h>
+#include "structs.h"
 
-typedef struct
+
+/*@brief 计算目标点到达路径的距离,点在路径左侧为负,右侧为正
+ *@brief 该函数主要用于计算主体车辆到路径的距离(横向偏差),并更新最近点索引
+ *@param x,y         目标点坐标
+ *@param path_points 路径点集
+ *@param ref_point_index 参考点索引，以此参考点展开搜索，加速计算
+ *@param nearest_point_index 输出与目标点最近的路径点索引
+ */
+float calculateDis2path(const double& x,const double& y,
+						 const path_t & path_points, //path
+						 size_t   ref_point_index, //参考点索引
+						 size_t& nearest_point_index)
 {
-	double longitude;
-	double latitude;
-	double yaw;
-	double x;
-	double y;
-	float curvature;
-	float maxOffset_left;
-	float maxOffset_right;
-}gpsMsg_t;
-//对此结构体进行修改，此为路径点信息，并非gps信息
+	int searchDir; //搜索方向 -1:向后搜索， 1：向前搜索， 0 搜索完毕
+	if(ref_point_index == 0)
+	{
+		ref_point_index = 1;
+		searchDir = 1;
+	}
+	else if(ref_point_index == path_points.size()-1)
+	{
+		ref_point_index = path_points.size()-2;
+		searchDir = -1;
+	}
+	else
+	{
+		float dis2ref  = pow(path_points[ref_point_index].x   - x, 2) + 
+					     pow(path_points[ref_point_index].y   - y, 2);
+		float dis2last = pow(path_points[ref_point_index-1].x - x, 2) + 
+					     pow(path_points[ref_point_index-1].y - y, 2);
+		float dis2next = pow(path_points[ref_point_index+1].x - x, 2) + 
+					     pow(path_points[ref_point_index+1].y - y, 2);
+		if(dis2next > dis2ref && dis2last > dis2ref) 
+			searchDir = 0;
+		else if(dis2next > dis2ref && dis2ref > dis2last)
+			searchDir = -1;
+		else
+			searchDir = 1;
+	}
+	
+	//std::cout  <<  "searchDir:"  << "\t" << searchDir << "\r\n";
+	while(ref_point_index>0 && ref_point_index<path_points.size()-1)
+	{
+		float dis2ref  = pow(path_points[ref_point_index].x   - x, 2) + 
+							pow(path_points[ref_point_index].y   - y, 2);
+		float dis2last = pow(path_points[ref_point_index-1].x - x, 2) + 
+							pow(path_points[ref_point_index-1].y - y, 2);
+		float dis2next = pow(path_points[ref_point_index+1].x - x, 2) + 
+							pow(path_points[ref_point_index+1].y - y, 2);
+	//std::cout  << ref_point_index << "\t" <<  sqrt(dis2last)  << "\t" << sqrt(dis2ref) << "\t" << sqrt(dis2next) << "\r\n";		
+		if((searchDir == 1 && dis2next > dis2ref) ||
+		   (searchDir ==-1 && dis2last > dis2ref) ||
+		   (searchDir == 0))
+			break;
 
-typedef struct
+		ref_point_index += searchDir;
+	}
+	float anchor_x,anchor_y, anchor_yaw; //锚点的位置和航向
+	anchor_x = path_points[ref_point_index].x;
+	anchor_y = path_points[ref_point_index].y;
+	anchor_yaw = path_points[ref_point_index].yaw;
+
+	nearest_point_index = ref_point_index;
+	//float dis2anchor = sqrt((x-anchor_x)*(x-anchor_x)+(y-anchor_y)*(y-anchor_y));
+	float dx = (x-anchor_x)*cos(anchor_yaw) - (y-anchor_y) * sin(anchor_yaw);
+	return dx;
+}
+
+/*@brief 计算目标点到达路径的距离,点在路径左侧为负,右侧为正
+ *@brief 该函数主要用于计算目标到路径的距离,并考虑路径终点问题
+ *@param x,y         目标点坐标
+ *@param path_points 路径点集
+ *@param ref_point_index 参考点索引，以此参考点展开搜索，加速计算
+ *@param max_search_index 最大搜索索引,超出此索引的目标物则输出距离为FLT_MAX
+ */
+float calculateDis2path2(const double& x,const double& y,
+						 const std::vector<gpsMsg_t>& path_points, 
+						 size_t  ref_point_index, //参考点索引
+						 size_t  max_search_index)
 {
-	bool flag; // invalid ?
-	float roadwheel_angle;
-	float speed;
-	float brake;
-}controlMsg_t;
+	int searchDir; //搜索方向 -1:向后搜索， 1：向前搜索， 0 搜索完毕
+	if(ref_point_index == 0)
+	{
+		ref_point_index = 1;
+		searchDir = 1;
+	}
+	else if(ref_point_index == path_points.size()-1)
+	{
+		ref_point_index = path_points.size()-2;
+		searchDir = -1;
+	}
+	else
+	{
+		float dis2ref  = pow(path_points[ref_point_index].x   - x, 2) + 
+					     pow(path_points[ref_point_index].y   - y, 2);
+		float dis2last = pow(path_points[ref_point_index-1].x - x, 2) + 
+					     pow(path_points[ref_point_index-1].y - y, 2);
+		float dis2next = pow(path_points[ref_point_index+1].x - x, 2) + 
+					     pow(path_points[ref_point_index+1].y - y, 2);
+		if(dis2next > dis2ref && dis2last > dis2ref) 
+			searchDir = 0;
+		else if(dis2next > dis2ref && dis2ref > dis2last)
+			searchDir = -1;
+		else
+			searchDir = 1;
+	}
+	
+	//std::cout  <<  "searchDir:"  << "\t" << searchDir << "\r\n";
+	while(ref_point_index>0 && ref_point_index<path_points.size()-1)
+	{
+		float dis2ref  = pow(path_points[ref_point_index].x   - x, 2) + 
+							pow(path_points[ref_point_index].y   - y, 2);
+		float dis2last = pow(path_points[ref_point_index-1].x - x, 2) + 
+							pow(path_points[ref_point_index-1].y - y, 2);
+		float dis2next = pow(path_points[ref_point_index+1].x - x, 2) + 
+							pow(path_points[ref_point_index+1].y - y, 2);
+	//std::cout  << ref_point_index << "\t" <<  sqrt(dis2last)  << "\t" << sqrt(dis2ref) << "\t" << sqrt(dis2next) << "\r\n";		
+		if((searchDir == 1 && dis2next > dis2ref) ||
+		   (searchDir ==-1 && dis2last > dis2ref) ||
+		   (searchDir == 0))
+			break;
 
-typedef struct
-{
-	std::vector<gpsMsg_t> points;
-	float resolution; //分辨率,即路径点间的间距
-	void clear()
-	{
-		points.clear();
+		ref_point_index += searchDir;
 	}
-	size_t size()
+	float anchor_x,anchor_y, anchor_yaw; //锚点的位置和航向
+	anchor_x = path_points[ref_point_index].x;
+	anchor_y = path_points[ref_point_index].y;
+	anchor_yaw = path_points[ref_point_index].yaw;
+	
+	//若参考索引大于最大搜索索引,且目标物与车辆纵向距离大于一定阈值,则输出 FLT_MAX
+	if(ref_point_index >= max_search_index)
 	{
-		return points.size();
-	}
-}path_t;
-
-inline bool calculateDis2path(const double& X_,const double& Y_, //point corrdinate
-						 const path_t & path, //path
-						 const size_t& target_point_index, //the reference point index
-						 size_t& nearest_point_index,
-						 float& distance)                  //distance between point and path
-{
-	if(target_point_index == 0)
-	{
-		nearest_point_index = 0;
-	
-		//the direction of side c 
-		//float yaw_of_c = (path.points[first_point_index].yaw + path.points[second_point_index].yaw)/2;
-		float yaw_of_c = atan2(path.points[1].x-path.points[0].x, path.points[1].y-path.points[0].y);
-	
-		//object : world coordination to local coordination
-		float x = (X_-path.points[0].x) * cos(yaw_of_c) - (Y_-path.points[0].y) * sin(yaw_of_c);
-		//float y = (X_-path.points[first_point_index].x) * sin(yaw_of_c) + (Y_-path.points[first_point_index].y) * cos(yaw_of_c);
-	    distance = x;
-		return true;
-	}
-	
-	//ROS_INFO("path.points.size:%d\t target_point_index:%d",path.points.size(),target_point_index);
-	
-	//this target is tracking target,
-	//let the target points as the starting point of index
-	//Judging whether to index downward or upward
-	float dis2target = pow(path.points[target_point_index].x - X_, 2) + 
-					   pow(path.points[target_point_index].y - Y_, 2) ;
-	
-	float dis2next_target = pow(path.points[target_point_index+1].x - X_, 2) + 
-							pow(path.points[target_point_index+1].y - Y_, 2) ;
-							
-	float dis2last_target = pow(path.points[target_point_index-1].x - X_, 2) + 
-					        pow(path.points[target_point_index-1].y - Y_, 2) ;
-	
-	//std::cout << sqrt(dis2target)<<"\t"<< sqrt(dis2next_target) <<"\t"<< sqrt(dis2last_target) << std::endl;
-	
-	float first_dis ,second_dis ;  //a^2 b^2 
-	size_t first_point_index,second_point_index;
-	
-	first_dis = dis2target;
-	first_point_index = target_point_index;
-	
-	int is_yawReverse = 0;
-	
-	if(dis2last_target <dis2target && dis2next_target > dis2target) //downward
-	{
-		is_yawReverse = 1;
-		for(size_t i=1;true;i++)
-		{
-		/*   prevent size_t index 0-1 data overflow    */
-			if(target_point_index >= i)
-				second_point_index = target_point_index-i;
-			else
-			{
-				first_point_index = 1;
-				second_point_index = 0;
-				break;
-			}
-		/*   prevent size_t index 0-1 data overflow    */
-			
-			second_dis = pow(path.points[second_point_index].x - X_, 2) + 
-						 pow(path.points[second_point_index].y - Y_, 2) ;
-			
-			if(second_dis < first_dis) //continue 
-			{
-				first_dis = second_dis;
-				first_point_index = second_point_index;
-			}
-			else  //end
-				break;
-		}
-	}
-	else if(dis2next_target < dis2target && dis2last_target > dis2target) //upward
-	{
-		for(size_t i=1;true;i++)
-		{
-			second_point_index = target_point_index + i;
-			if(second_point_index >= path.points.size())
-			{
-				// distance = 0.0;
-				// nearest_point_index = 0;
-				return false;
-			}
-			
-			second_dis = pow(path.points[second_point_index].x - X_, 2) + 
-						 pow(path.points[second_point_index].y - Y_, 2) ;
-
-			if(second_dis < first_dis) //continue
-			{
-				first_dis = second_dis;
-				first_point_index = second_point_index;
-			}
-			else  //end
-				break;
-		}
-	}
-	else //midile
-	{
-		first_point_index = target_point_index-1;
-		//first_point_index = target_point_index;
+		anchor_x = path_points[max_search_index].x;
+		anchor_y = path_points[max_search_index].y;
+		anchor_yaw = path_points[max_search_index].yaw;
+		float dy = (x-anchor_x)*sin(anchor_yaw) + (y-anchor_y) * cos(anchor_yaw);
+		//float dx = (x-anchor_x)*cos(anchor_yaw) - (y-anchor_y) * sin(anchor_yaw);
+	//printf("dx:%.2f\tdy:%.2f\tref_point_index:%d\tmax_search_index:%d\n",dx,dy,ref_point_index,max_search_index);
 		
-		second_point_index = target_point_index +1;
+		if(dy > 0.5)
+			return FLT_MAX;
 	}
-		
-
-	nearest_point_index = (first_point_index+second_point_index)/2;
 	
-	//the direction of side c
-	//float yaw_of_c = (path.points[first_point_index].yaw + path.points[second_point_index].yaw)/2;
-	float yaw_of_c = is_yawReverse*M_PI + atan2(path.points[second_point_index].x-path.points[first_point_index].x,
-									   path.points[second_point_index].y-path.points[first_point_index].y);
-				
-	//object : world coordination to local coordination
-	float x = (X_-path.points[first_point_index].x) * cos(yaw_of_c) - (Y_-path.points[first_point_index].y) * sin(yaw_of_c);
-	//float y = (X_-path.points[first_point_index].x) * sin(yaw_of_c) + (Y_-path.points[first_point_index].y) * cos(yaw_of_c);
+	//printf("dx:%.2f\tdy:%.2f\tref_point_index:%d\n",dx,dy,ref_point_index);
 	
-	//ROS_ERROR("index1:%d\t index2:%d",first_point_index,second_point_index);
-
-	distance = x;
-	return true;
+	return (x-anchor_x)*cos(anchor_yaw) - (y-anchor_y) * sin(anchor_yaw);
 }
 
 inline bool is_gps_data_valid(gpsMsg_t& point)
@@ -172,7 +163,7 @@ inline bool is_gps_data_valid(gpsMsg_t& point)
 	return false;
 }
 
-inline float dis2Points(const gpsMsg_t& point1, const gpsMsg_t& point2,bool is_sqrt)
+inline float dis2Points(const gpsMsg_t& point1, const gpsMsg_t& point2,bool is_sqrt=true)
 {
 	float x = point1.x - point2.x;
 	float y = point1.y - point2.y;
@@ -240,26 +231,28 @@ inline float generateRoadwheelAngleByRadius(const float& radius, const float& wh
 	return atan(wheel_base/radius)*180/M_PI;    //correct algorithm 
 }
 
-inline bool loadPath(std::string file_path, path_t& path)
+inline bool loadPath(const std::string& file_path, path_t& path)
 {
-	
 	FILE *fp = fopen(file_path.c_str(),"r");
 	
 	if(fp==NULL)
 	{
-		printf("open %s failed",file_path.c_str());
+		printf("[loadPath] open %s failed\r\n",file_path.c_str());
 		return false;
 	}
+	if(path.size() != 0)
+		path.clear();
 	
 	gpsMsg_t point;
-	
 	while(!feof(fp))
 	{
 		fscanf(fp,"%lf\t%lf\t%lf\n",&point.x,&point.y,&point.yaw);
 		path.points.push_back(point);
 	}
-	path.resolution = 0.1; //应从文件载入
+	path.resolution = 0.1; 
 	fclose(fp);
+	if(path.size() < 2)
+		return false;
 	return true;
 }
 

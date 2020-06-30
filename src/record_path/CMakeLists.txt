@@ -11,9 +11,8 @@ find_package(catkin REQUIRED COMPONENTS
   gps_msgs
   serial
   interface
-  path_tracking
+  auto_drive
 )
-
 
 catkin_package(
   #INCLUDE_DIRS include

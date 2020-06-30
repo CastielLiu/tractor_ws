@@ -21,14 +21,13 @@
 #include<mutex>
 #include<vector>
 
-
-
 class PathTracking
 {
 public:
 	PathTracking(const ros::NodeHandle& nh, const ros::NodeHandle& nh_private);
 	~PathTracking();
 	bool init(const gpsMsg_t& vehicle_point );
+	bool isRunning() {return is_running_;}
 	void setPath(const path_t& path);
 	
 	int update(float speed, float road_wheelangle,  //vehicle state
@@ -64,6 +63,7 @@ private:
 	float foreSightDis_speedCoefficient_;
 	float foreSightDis_latErrCoefficient_;
 	float wheel_base_;
+	bool is_running_;
 	
 };
 

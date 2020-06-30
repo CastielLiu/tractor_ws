@@ -16,9 +16,9 @@ find_package(catkin REQUIRED COMPONENTS
 
 
 catkin_package(
-#  INCLUDE_DIRS include
+  INCLUDE_DIRS include
 #  LIBRARIES auto_drive
-#  CATKIN_DEPENDS driverless_msgs roscpp rospy serial std_msgs
+  CATKIN_DEPENDS driverless_msgs roscpp rospy serial std_msgs
 #  DEPENDS system_lib
 )
 
@@ -28,6 +28,9 @@ include_directories(
   ${catkin_INCLUDE_DIRS}
 )
 
-add_executable(${PROJECT_NAME}_node src/auto_drive_node.cpp src/avoiding.cpp src/path_tracking.cpp)
+
+aux_source_directory (src SRC_FILE)
+
+add_executable(${PROJECT_NAME}_node ${SRC_FILE})
 add_dependencies(${PROJECT_NAME}_node ${${PROJECT_NAME}_EXPORTED_TARGETS} ${catkin_EXPORTED_TARGETS})
 target_link_libraries(${PROJECT_NAME}_node ${catkin_LIBRARIES})

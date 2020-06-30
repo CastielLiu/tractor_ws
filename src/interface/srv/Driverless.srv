@@ -10,7 +10,13 @@ uint8  VERTEX_TYPE=100
 uint8  CURVE_TYPE =101
 
 float32 speed
+
 ---
 
-uint8  success
+uint8 SUCCESS = 0
+uint8 PATH_FILE_NOT_EXIST = 1
+uint8 FAIL = 2
+uint8 PATH_FILE_ERROR = 3
+
+uint8 success
 
