@@ -3,6 +3,7 @@ uint8  command_type
 uint8  START = 1
 uint8  STOP = 2
 uint8  SUSPEND = 3
+uint8  CONFIRM_STOP=4
 
 string path_file_name
 uint8  path_type

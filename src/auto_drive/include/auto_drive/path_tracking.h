@@ -29,8 +29,9 @@ public:
 	bool init(const gpsMsg_t& vehicle_point );
 	bool isRunning() {return is_running_;}
 	void setPath(const path_t& path);
+	bool extendGlobalPath(float extendDis);
 	
-	int update(float speed, float road_wheelangle,  //vehicle state
+	bool update(float speed, float road_wheelangle,  //vehicle state
 			   const gpsMsg_t& vehicle_point,      //vehicle positoin
 			   const float& path_offset); 
 	void getTrackingCmd(float& speed, float& roadWheelAngle);
@@ -64,6 +65,7 @@ private:
 	float foreSightDis_latErrCoefficient_;
 	float wheel_base_;
 	bool is_running_;
+	size_t destination_index_;
 	
 };
 

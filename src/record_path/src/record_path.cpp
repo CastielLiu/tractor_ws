@@ -3,7 +3,7 @@
 #include <cmath>
 #include <nav_msgs/Odometry.h>
 #include <interface/RecordPath.h>
-#include "auto_drive/function.h"
+#include "auto_drive/structs.h"
 
 #define __NAME__ "record_path"
 
@@ -90,6 +90,16 @@ bool Recorder::init()
 	sub_utm_ = nh.subscribe(utm_topic, 1, &Recorder::odom_callback,this);
 	
 	return true;
+}
+
+float dis2Points(const gpsMsg_t& point1, const gpsMsg_t& point2,bool is_sqrt)
+{
+	float x = point1.x - point2.x;
+	float y = point1.y - point2.y;
+	
+	if(is_sqrt)
+		return sqrt(x*x +y*y);
+	return x*x+y*y;
 }
 
 bool Recorder::recordPathService(interface::RecordPath::Request  &req,

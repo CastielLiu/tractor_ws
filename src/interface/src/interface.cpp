@@ -45,8 +45,8 @@ bool Interface::init()
 	client_recordPath_ = nh.serviceClient<interface::RecordPath>("record_path_service");
 	//创建自动驾驶服务客户端
 	client_driverless_ = nh.serviceClient<interface::Driverless>("driverless_service");
-	//创建其他服务客户端
-	other_srv_nh_ = nh.advertiseService("other_service",&Interface::otherService, this);
+	//创建自动驾驶状态服务端
+	driverless_status_srv_nh_ = nh.advertiseService("driverlessStatus_service",&Interface::driverlessStatusService, this);
 	
 	nh_private.param<std::string>("can2serial_port",can2serial_port_,"");
 	nh_private.param<int>("can_baudrate",can_baudrate_,250);
@@ -167,13 +167,10 @@ void Interface::path_tracking_info_callback(const driverless_msgs::PathTrackingI
 	info_.status.data[5] = lateral_err/2;
 }
 
-bool Interface::otherService(interface::Other::Request  &req,
-							 interface::Other::Response &res)
+bool Interface::driverlessStatusService(interface::DriverlessStatus::Request  &req,
+							 			interface::DriverlessStatus::Response &res)
 {
-	if(req.data == "path tracking complete")
-	{
-		;
-	}
+	
 	
 	return true;
 }

@@ -5,6 +5,8 @@
  * email:  castiel_liu@outlook.com
  */
 
+#define __NAME__ "path_tracking"
+
 PathTracking::PathTracking(const ros::NodeHandle& nh, const ros::NodeHandle& nh_private):
 	nh_(nh),
     nh_private_(nh_private)
@@ -40,10 +42,45 @@ bool PathTracking::init(const gpsMsg_t& vehicle_point)
 	return true;
 }
 
-// 0 update no
-// 1 update ok
-// 2 path_tracking over
-int PathTracking::update(float speed, float road_wheelangle,  //vehicle state
+/*@brief 拓展全局路径,防止车辆临近终点时无法预瞄
+ *@param extendDis 拓展长度，保证实际终点距离虚拟终点大于等于extendDis
+ */
+bool PathTracking::extendGlobalPath(float extendDis)
+{
+	//取最后一个点与倒数第n个点的连线向后插值
+	//总路径点不足n个,退出
+	int n = 5;
+	//std::cout << "extendGlobalPath: " << path_.points.size() << "\t" << path_.points.size()-1 << std::endl;
+	if(path_.points.size()-1 < n)
+	{
+		ROS_ERROR("[%s] global path points is too few (%d), extend global path failed",path_.points.size()-1, __NAME__);
+		return false;
+	}
+	int endIndex = path_.points.size()-1;
+	
+	float dx = (path_.points[endIndex].x - path_.points[endIndex-n].x)/n;
+	float dy = (path_.points[endIndex].y - path_.points[endIndex-n].y)/n;
+	float ds = sqrt(dx*dx+dy*dy);
+
+	gpsMsg_t point;
+	float remaindDis = 0.0;
+	for(size_t i=1;;++i)
+	{
+		point.x = path_.points[endIndex].x + dx*i;
+		point.y = path_.points[endIndex].y + dy*i;
+		point.curvature = 0.0;
+		path_.points.push_back(point);
+		remaindDis += ds;
+		if(remaindDis > extendDis)
+			break;
+	}
+	return true;
+}
+
+/*@brief  更新跟踪器状态并生成控制指令
+ *@return true 更新成功,　false 到达终点
+ */
+bool PathTracking::update(float speed, float road_wheelangle,  //vehicle state
 						 const gpsMsg_t& vehicle_point,      //vehicle positoin
 						 const float& path_offset)
 {
@@ -55,8 +92,9 @@ int PathTracking::update(float speed, float road_wheelangle,  //vehicle state
 	
 	lateral_err_ = calculateDis2path(vehicle_point.x, vehicle_point.y, path_, nearest_point_index_, //input
 					            nearest_point_index_); //output
-	// lateral_err_ = lateral_err_ - path_offset; 
-	//添加退出条件！！
+	
+	lateral_err_ = lateral_err_ - path_offset; 
+
 
 	disThreshold_ = foreSightDis_latErrCoefficient_ * fabs(lateral_err_) + min_foresight_distance_; 
 
@@ -68,18 +106,23 @@ int PathTracking::update(float speed, float road_wheelangle,  //vehicle state
 	if( dis_yaw.first < disThreshold_)
 	{
 		++target_point_index_;
-		
 	}
 	float yaw_err = dis_yaw.second - vehicle_point.yaw;
 	
 	if(yaw_err==0.0)
-		return 0;
+		return true;
 	
 	float turning_radius = (-0.5 * dis_yaw.first)/sin(yaw_err);
 
 	t_roadwheel_angle_ = generateRoadwheelAngleByRadius(turning_radius, wheel_base_);
 	
-	t_speed_ = 20.0; //temp
+	if(nearest_point_index_ > destination_index_-10)
+	{
+		t_speed_ = 0.0;
+		return false;
+	}
+	else
+		t_speed_ = 10.0; 
 	
 	if(++cnt%20==0)
 	{
@@ -88,12 +131,16 @@ int PathTracking::update(float speed, float road_wheelangle,  //vehicle state
 		ROS_INFO("path_offset:%f\n",path_offset);
 	}
 	this->publishInfo();
+	return true;
 }
 
 void PathTracking::setPath(const path_t& path)
 {
 	path_mutex_.lock();
     path_ = path;
+	//终点索引为拓展前路径的最后一个点
+	destination_index_ = path_.size()-1;
+	extendGlobalPath(20.0);
 	path_mutex_.unlock();
 }
 

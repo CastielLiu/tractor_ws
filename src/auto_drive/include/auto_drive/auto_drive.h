@@ -4,6 +4,9 @@
 #include"auto_drive/path_tracking.h"
 #include"auto_drive/avoiding.h"
 #include<nav_msgs/Odometry.h>
+#include <interface/DriverlessStatus.h>
+#include <interface/Driverless.h>
+//#include <>
 #include"ros/ros.h"
 
 namespace fs = boost::filesystem;
@@ -17,10 +20,10 @@ class AutoDrive
     void run();
     void autoDriveThread(float speed);
     void odom_callback(const nav_msgs::Odometry::ConstPtr& msg);
-    void timer_callback(const ros::TimerEvent&);
+    void update_timer_callback(const ros::TimerEvent&);
     bool driverlessService(interface::Driverless::Request  &req,
 									 interface::Driverless::Response &res);
-	bool callOtherService(const std::string& data);
+	bool callDriverlessStatusService(uint8_t status);
 
   private: 
     float max_speed_;
@@ -34,8 +37,10 @@ class AutoDrive
 	ros::Timer timer_;
 	ros::Publisher pub_cmd_;
     ros::Subscriber sub_utm_;
+    ros::Timer update_timer_;
+
     ros::ServiceServer srv_driverless_;
-	ros::ServiceClient other_client_nh_;
+	ros::ServiceClient driverless_status_client_nh_;
     ros::NodeHandle nh_, nh_private_;
 
     boost::shared_ptr<boost::thread> auto_drive_thread_ptr_;
