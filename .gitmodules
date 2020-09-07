@@ -1,3 +1,6 @@
 [submodule "src/can2serial"]
 	path = src/can2serial
 	url = https://github.com/CastielLiu/can2serial.git
+[submodule "src/gps_driver"]
+	path = src/gps_driver
+	url = https://github.com/CastielLiu/gps_driver.git

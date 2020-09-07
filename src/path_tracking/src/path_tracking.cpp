@@ -43,7 +43,7 @@ bool PathTracking::init(ros::NodeHandle nh,ros::NodeHandle nh_private)
 	pub_info_ = nh.advertise<driverless_msgs::PathTrackingInfo>("/path_tracking_info",1);
 	
 	srv_driverless_ = nh.advertiseService("driverless_service",&PathTracking::driverlessService,this);
-	other_client_nh_ = nh.serviceClient<interface::Other>("other_service");
+//	other_client_nh_ = nh.serviceClient<interface::Other>("other_service");
 	
 	nh_private.param<std::string>("path_file_dir",path_file_dir_,"");
 	
@@ -293,9 +293,9 @@ void PathTracking::avoiding_flag_callback(const std_msgs::Float32::ConstPtr& msg
 
 bool PathTracking::callOtherService(const std::string& data)
 {
-	interface::Other other;
-	other.request.data = data;
-	other_client_nh_.call(other);
+//	interface::Other other;
+//	other.request.data = data;
+//	other_client_nh_.call(other);
 }
 
 int main(int argc,char**argv)

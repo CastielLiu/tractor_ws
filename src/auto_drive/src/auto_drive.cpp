@@ -52,7 +52,7 @@ bool AutoDrive::init()
 	while(ros::ok() && !is_gps_data_valid(vehicle_point_))
 	{
 		ROS_INFO("[AutoDrive]: gps data is invalid, please check the gps topic or waiting...");
-		sleep(0.5);
+		ros::Duration(0.5).sleep();
 	}
 
     pub_cmd_ = nh_.advertise<driverless_msgs::ControlCmd>("/cmd",1);
@@ -83,6 +83,7 @@ bool AutoDrive::driverlessService(interface::Driverless::Request  &req,
 		fs::path file = fs::path(path_file_dir_)/req.path_file_name;
 		if(!fs::exists(file))
 		{
+		    ROS_ERROR("[%s] %s FileNotExist.",__NAME__,fs::system_complete(file).string().c_str());
 			res.success = FileNotExist;
 			return true;
 		}

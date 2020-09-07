@@ -148,9 +148,9 @@ void Interface::odom_callback(const nav_msgs::Odometry::ConstPtr& msg)
 	*(uint32_t *)(info_.gps.data) = uint32_t (longitude*10000000);
 	*(uint32_t *)(info_.gps.data+4) = uint32_t (latitude*10000000);
 	
-	*(uint16_t *)(info_.status.data) = uint16_t(yaw*10);
+	*(uint16_t *)(info_.status.data) = uint16_t(yaw*10); //yaw
 	info_.status.data[2] = 10 << 3;  //satellite_num << 3
-	info_.status.data[2] |= 0x01; // none differentiation positioning
+	info_.status.data[2] |= 0x01; // none differentiation positioning 
 	*(uint16_t *)(info_.status.data+6) = height;
 }
 
@@ -170,7 +170,6 @@ void Interface::path_tracking_info_callback(const driverless_msgs::PathTrackingI
 bool Interface::driverlessStatusService(interface::DriverlessStatus::Request  &req,
 							 			interface::DriverlessStatus::Response &res)
 {
-	
 	
 	return true;
 }

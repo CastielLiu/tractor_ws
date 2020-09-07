@@ -18,7 +18,7 @@ find_package(catkin REQUIRED COMPONENTS
 catkin_package(
   INCLUDE_DIRS include
 #  LIBRARIES auto_drive
-  CATKIN_DEPENDS driverless_msgs roscpp rospy serial std_msgs
+  CATKIN_DEPENDS driverless_msgs roscpp rospy serial std_msgs jsk_recognition_msgs interface
 #  DEPENDS system_lib
 )
 

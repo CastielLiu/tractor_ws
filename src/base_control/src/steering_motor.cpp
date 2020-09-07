@@ -31,7 +31,7 @@ SteerMotor::SteerMotor()
 	is_read_serial_ = false;
 	road_wheel_angle_ = 0.0;
 	road_wheel_angle_resolution_ = 180.0/4096;
-	road_wheel_angle_offset_ = 0.0;
+	road_wheel_angle_offset_ = 0.0; //前轮转角偏移值
 	is_enabled_ = false;
 	errorMsg_ = 0x00;
 }

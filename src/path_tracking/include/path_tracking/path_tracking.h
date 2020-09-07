@@ -4,7 +4,6 @@
 #include<boost/filesystem.hpp>
 #include<driverless_msgs/PathTrackingInfo.h>
 #include<interface/Driverless.h>
-#include<interface/Other.h>
 #include<driverless_msgs/ControlCmd.h>
 #include"path_tracking/function.h"
 #include<std_msgs/Float32.h>
