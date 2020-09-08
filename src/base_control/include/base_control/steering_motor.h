@@ -27,8 +27,10 @@ class SteerMotor
 	void enable();
 	bool is_enabled(){return is_enabled_;}
 	void setRoadWheelAngle(float angle);
-	const float &getRoadWheelAngle(){return road_wheel_angle_;}
+	const float getRoadWheelAngle(){return road_wheel_angle_;}
 	const uint16_t getAdcValue(){return adcValue_;}
+	const uint8_t getErrorMsg() {return errorMsg_;}
+	
 	void setRoadWheelAngleResolution(float val){road_wheel_angle_resolution_ = val;}
 	void setRoadWheelAngleOffset(float offset){road_wheel_angle_offset_ = offset;}
   private:
@@ -53,8 +55,8 @@ class SteerMotor
 	float road_wheel_angle_resolution_;
 	float road_wheel_angle_offset_;
 	bool is_enabled_;
-	bool motor_speed_;
-	bool errorMsg_;
+	float motor_speed_;
+	uint8_t errorMsg_;
 };
 
 #endif

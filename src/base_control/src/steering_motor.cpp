@@ -133,6 +133,7 @@ void SteerMotor::readSerialPort()
 	        std::cout << output.str() <<std::endl;
     	}
     	if(len==0) continue;
+    	//else std::cout << "received "<< len << "bytes data" << std::endl;
     	
 		// add data to the buffer to be parsed
 		
@@ -159,51 +160,50 @@ void SteerMotor::BufferIncomingData(uint8_t *message, int length)
 	static int dataLength =0;
 	static int dataRemaind =0;
 	static uint8_t pkg_buffer[MaxPkgLen];
+	
+//	for(int i=0; i<length; ++i)
+//		printf("%0x\t",message[i]);
+//	std::cout << std::endl;
+	
 	for(int i=0; i<length; ++i)
 	{
 		if(bufferIndex>MaxPkgLen-1) //avoid out of range
 			bufferIndex = 0;
+			
 		uint8_t data = message[i];
 		
 		if(0 == bufferIndex)
 		{
-			if(data == 0x01)
-			{
+			if(data == 0x01) //device id
 				pkg_buffer[bufferIndex++] = data;
-			}
 		}
 		else if(1 == bufferIndex)
 		{
-			if(data == 0x03)
-			{
+			if(data == 0x03) //response read register
 				pkg_buffer[bufferIndex++] = data;
-			}
 			else
 				bufferIndex = 0;
 		}
 		else if(2 == bufferIndex)
 		{
-			if(data == 0x02) //length
-			{
-				dataLength = data;
-				pkg_buffer[bufferIndex++] = data;
-			}
-			else
-				bufferIndex = 0;
+		    pkg_buffer[bufferIndex++] = data;
+		    dataLength = pkg_buffer[bufferIndex-1];
+//			std::cout << " dataLength : " << dataLength << "\n";
+				
 		}
-		else if(2+dataLength+2 == bufferIndex) //2+dataLen+crcLen
+		else if(2+dataLength+2 == bufferIndex) //2(id,cmd) +dataLen +2(crcLen)
 		{
 			pkg_buffer[bufferIndex] = data;
 			
 			uint16_t check_num = generateModBusCRC_byTable(pkg_buffer,3+dataLength);
 			
-			/*
-			for(int i=0; i<=bufferIndex; ++i)
-				printf("0x%0x\t",pkg_buffer[i]);
-			std::cout << std::endl;
-			std::cout << std::hex << (check_num&0xff) << "\t"<< (check_num>>8)  << std::endl;
-			std::cout << std::hex << int(pkg_buffer[bufferIndex]) << "\t" << int(pkg_buffer[bufferIndex-1]);
-			*/
+			
+//			for(int i=0; i<=bufferIndex; ++i)
+//				printf("0x%0x\t",pkg_buffer[i]);
+//			std::cout << std::endl;
+//			std::cout << std::hex << (check_num&0xff) << "\t"<< (check_num>>8)  << std::endl;
+//			std::cout << std::hex << int(pkg_buffer[bufferIndex]) << "\t" << int(pkg_buffer[bufferIndex-1]);
+			
 			
 			if((check_num&0xff)==pkg_buffer[bufferIndex-1] && (check_num>>8)==pkg_buffer[bufferIndex])
 			{
@@ -258,8 +258,8 @@ void SteerMotor::enable()
     if(is_enabled_)
         return;
 
-		//														  0x01 //enable
-		//														  0x00 //disable
+	//										                     				  0x01 //enable
+	//											                    			  0x00 //disable
 	const uint8_t steeringEnableCmd[11]={0x01,0x10,0x00,0x33,0x00,0x01,0x02,0x00,0x01,0x62,0x53};
 	sendCmd(steeringEnableCmd,11);
 }
@@ -276,6 +276,9 @@ void SteerMotor::setSteeringRotate(float cycleNum)
 	static uint8_t steeringRotateCmd[13] = {0x01,0x10,0x01,0x36,0x00,0x02,0x04};//+4bytes pulseNum +2bytes check_num
 	
 	int pulseNum = -cycleNum*32768;
+	
+	std::cout << "pulseNum: " << pulseNum << std::endl;
+	
 	if(pulseNum < 0)
 		steeringRotateCmd[3] = 0x36; //clock wise ID
 	else
@@ -293,14 +296,16 @@ void SteerMotor::setSteeringRotate(float cycleNum)
 
 void SteerMotor::setRoadWheelAngle(float angle)
 {
-    this->rotate(road_wheel_angle_ - angle);
+    float angle_diff = angle - road_wheel_angle_;
+    std::cout << "now: " << road_wheel_angle_ << "\texpect: " << angle << "\tdiff:"<<  angle_diff << std::endl;
+    this->rotate(angle_diff);
 }
 
 void SteerMotor::rotate(float angle, uint8_t speed)
 {
 	//deg roadWheelAngle -> 1 cycle of steeringMotor
 	static const float degreePerCycle = 20.0;
-	float cycleNum = -angle / degreePerCycle;
+	float cycleNum = angle / degreePerCycle;
 	
 	if(motor_speed_ != speed)
 	{
@@ -313,6 +318,11 @@ void SteerMotor::rotate(float angle, uint8_t speed)
 
 void SteerMotor::requestAdcValue()
 {
+    //0x01 设备ID
+    //0x03 读寄存器
+    //0x40,0x0D 寄存器地址
+    //0x00,0x01 寄存器长度，读1个字节
+    //0x00,0x09 CRC16
 	static const uint8_t getAdcValueCmd[8]  = {0x01,0x03,0x40,0x0D,0x00,0x01,0x00,0x09}; 
 		//response-> 01 03 02 {0A 32} 3F 31  16bits AD value
 	sendCmd(getAdcValueCmd,8);
@@ -323,8 +333,13 @@ void SteerMotor::requestAdcValue()
 
 void SteerMotor::requestEnableStatus()
 {
+    //0x01 设备ID
+    //0x03 读寄存器
+    //0x00,0x33 使能状态寄存器地址
+    //0x00,0x02 读取寄存器长度，读2个字节
+    
 	uint8_t cmd[8] = {0x01,0x03,0x00,0x33,0x00,0x02};
-	uint16_t CRC_checkNum = generateModBusCRC_byTable(cmd,8);
+	uint16_t CRC_checkNum = generateModBusCRC_byTable(cmd,6);
 	cmd[6] = CRC_checkNum & 0xff;
 	cmd[7] = CRC_checkNum >>8;
 	sendCmd(cmd,8);
@@ -334,8 +349,12 @@ void SteerMotor::requestEnableStatus()
 
 void SteerMotor::requestMotorSpeed()
 {
+    //0x01 设备ID
+    //0x03 读寄存器
+    //0x00,0x6A 转速寄存器地址
+    //0x00,0x03 读取寄存器长度，读3个字节
 	uint8_t cmd[8] = {0x01,0x03,0x00,0x6A,0x00,0x03};
-	uint16_t CRC_checkNum = generateModBusCRC_byTable(cmd,8);
+	uint16_t CRC_checkNum = generateModBusCRC_byTable(cmd,6);
 	cmd[6] = CRC_checkNum & 0xff;
 	cmd[7] = CRC_checkNum >>8;
 	sendCmd(cmd,8);
@@ -345,8 +364,12 @@ void SteerMotor::requestMotorSpeed()
 
 void SteerMotor::requestErrorMsg()
 {
-	uint8_t getErrorMsgCmd[8] = {0x01,0x03,0x01,0x1F,0x00,0x04}; 
-	uint16_t CRC_checkNum = generateModBusCRC_byTable(getErrorMsgCmd,8);
+    //0x01 设备ID
+    //0x03 读寄存器
+    //0x01,0x1F 转速寄存器地址
+    //0x00,0x04 读取寄存器长度，读4个字节
+	uint8_t getErrorMsgCmd[8] = {0x01,0x03,0x01,0x1F,0x00,0x04};
+	uint16_t CRC_checkNum = generateModBusCRC_byTable(getErrorMsgCmd,6);
 	getErrorMsgCmd[6] = CRC_checkNum & 0xff;
 	getErrorMsgCmd[7] = CRC_checkNum >>8;
 	sendCmd(getErrorMsgCmd,8);

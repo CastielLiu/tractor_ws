@@ -2,7 +2,7 @@
 <launch>
 	<node name="base_control_node" pkg="base_control" type="base_control_node" required="true" output="screen">
 		<param name="steerMotor_port_name" value="/dev/ttyUSB0"/>
-		<param name="road_wheel_angle_offset" value="0.0"/>
+		<param name="road_wheel_angle_offset" value="-84"/>
 		<param name="road_wheel_angle_resolution" value="0.04"/>
 		
 		<param name="cmd_topic" value="/tractor_cmd"/>
