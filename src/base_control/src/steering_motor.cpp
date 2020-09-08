@@ -106,7 +106,7 @@ void SteerMotor::stopReadSerial()
 
 void SteerMotor::readSerialPort()
 {
-	serial_port_->flush();
+	serial_port_->flush(); //clear the old data from receive buffer
 	while (is_read_serial_) 
 	{
 		int len = 0;
@@ -245,6 +245,9 @@ void SteerMotor::sendCmd(const uint8_t* buf,int len)
 
 void SteerMotor::enable()
 {
+    if(is_enabled_)
+        return;
+    
 		//														  0x01 //enable
 		//														  0x00 //disable
 	const uint8_t steeringEnableCmd[11]={0x01,0x10,0x00,0x33,0x00,0x01,0x02,0x00,0x01,0x62,0x53};
@@ -283,8 +286,13 @@ void SteerMotor::run(float rotate_angle, uint8_t rotate_speed)
 	//deg roadWheelAngle -> 1 cycle of steeringMotor
 	static const float degreePerCycle = 20.0;
 	float cycleNum = -rotate_angle / degreePerCycle;
-	setSteeringSpeed(rotate_speed);
-	usleep(1000);
+	
+	if(motor_speed_ != rotate_speed)
+	{
+	    setSteeringSpeed(rotate_speed);
+	    usleep(1000);
+	}
+	
 	setSteeringRotate(cycleNum);
 }
 
