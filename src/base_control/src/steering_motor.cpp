@@ -1,5 +1,6 @@
 #include"base_control/steering_motor.h"
 
+
 static const uint16_t CRC16Table[]={
 0x0,    0xc0c1, 0xc181, 0x140,  0xc301, 0x3c0,  0x280,  0xc241, 0xc601, 0x6c0,  0x780,  0xc741, 0x500,  0xc5c1, 0xc481,
 0x440,  0xcc01, 0xcc0,  0xd80,  0xcd41, 0xf00,  0xcfc1, 0xce81, 0xe40,  0xa00,  0xcac1, 0xcb81, 0xb40,  0xc901, 0x9c0,
@@ -27,6 +28,7 @@ static uint8_t raw_buffer[MAX_LOAD_SIZE];
 
 SteerMotor::SteerMotor()
 {
+    use_condition_variable_ = false;
 	serial_port_ = NULL;
 	is_read_serial_ = false;
 	road_wheel_angle_ = 0.0;
@@ -96,7 +98,8 @@ void SteerMotor::startReadSerial()
 	if (is_read_serial_)
 		return;
 	is_read_serial_=true;
-	read_serial_thread_ptr_ = boost::shared_ptr<boost::thread >(new boost::thread(boost::bind(&SteerMotor::readSerialPort, this)));
+	read_serial_thread_ptr_ = 
+	    std::shared_ptr<std::thread >(new std::thread(&SteerMotor::readSerialPort, this));
 }
 
 void SteerMotor::stopReadSerial()
@@ -107,9 +110,16 @@ void SteerMotor::stopReadSerial()
 void SteerMotor::readSerialPort()
 {
 	serial_port_->flush(); //clear the old data from receive buffer
-	while (is_read_serial_) 
+	while ( is_read_serial_) 
 	{
 		int len = 0;
+		
+		if(use_condition_variable_)
+		{
+		    std::unique_lock<std::mutex> lck(cv_mutex_);
+            condition_variable_.wait(lck);
+		}
+		
 		usleep(10000);
 		try
 		{
@@ -247,7 +257,7 @@ void SteerMotor::enable()
 {
     if(is_enabled_)
         return;
-    
+
 		//														  0x01 //enable
 		//														  0x00 //disable
 	const uint8_t steeringEnableCmd[11]={0x01,0x10,0x00,0x33,0x00,0x01,0x02,0x00,0x01,0x62,0x53};
@@ -281,15 +291,20 @@ void SteerMotor::setSteeringRotate(float cycleNum)
 	sendCmd(steeringRotateCmd,13);
 }
 
-void SteerMotor::run(float rotate_angle, uint8_t rotate_speed)
+void SteerMotor::setRoadWheelAngle(float angle)
+{
+    this->rotate(road_wheel_angle_ - angle);
+}
+
+void SteerMotor::rotate(float angle, uint8_t speed)
 {
 	//deg roadWheelAngle -> 1 cycle of steeringMotor
 	static const float degreePerCycle = 20.0;
-	float cycleNum = -rotate_angle / degreePerCycle;
+	float cycleNum = -angle / degreePerCycle;
 	
-	if(motor_speed_ != rotate_speed)
+	if(motor_speed_ != speed)
 	{
-	    setSteeringSpeed(rotate_speed);
+	    setSteeringSpeed(speed);
 	    usleep(1000);
 	}
 	
@@ -301,6 +316,9 @@ void SteerMotor::requestAdcValue()
 	static const uint8_t getAdcValueCmd[8]  = {0x01,0x03,0x40,0x0D,0x00,0x01,0x00,0x09}; 
 		//response-> 01 03 02 {0A 32} 3F 31  16bits AD value
 	sendCmd(getAdcValueCmd,8);
+	
+	if(use_condition_variable_)
+	    condition_variable_.notify_one();
 }
 
 void SteerMotor::requestEnableStatus()
@@ -310,6 +328,8 @@ void SteerMotor::requestEnableStatus()
 	cmd[6] = CRC_checkNum & 0xff;
 	cmd[7] = CRC_checkNum >>8;
 	sendCmd(cmd,8);
+	if(use_condition_variable_)
+	    condition_variable_.notify_one();
 }
 
 void SteerMotor::requestMotorSpeed()
@@ -319,6 +339,8 @@ void SteerMotor::requestMotorSpeed()
 	cmd[6] = CRC_checkNum & 0xff;
 	cmd[7] = CRC_checkNum >>8;
 	sendCmd(cmd,8);
+	if(use_condition_variable_)
+	    condition_variable_.notify_one();
 }
 
 void SteerMotor::requestErrorMsg()
@@ -328,6 +350,8 @@ void SteerMotor::requestErrorMsg()
 	getErrorMsgCmd[6] = CRC_checkNum & 0xff;
 	getErrorMsgCmd[7] = CRC_checkNum >>8;
 	sendCmd(getErrorMsgCmd,8);
+	if(use_condition_variable_)
+	    condition_variable_.notify_one();
 }
 
 

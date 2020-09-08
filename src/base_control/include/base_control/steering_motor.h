@@ -2,9 +2,12 @@
 #define STEERING_MOTOR_H_
 #include<stdint.h>
 #include<string>
-#include<boost/thread.hpp>
-#include<boost/bind.hpp>
 #include<serial/serial.h>
+#include<thread>
+#include<memory>
+#include <condition_variable>
+#include <iostream>
+#include <unistd.h>
 
 class SteerMotor
 {
@@ -23,7 +26,7 @@ class SteerMotor
 	void disable();
 	void enable();
 	bool is_enabled(){return is_enabled_;}
-	void run(float rotate_angle, uint8_t rotate_speed=20);
+	void setRoadWheelAngle(float angle);
 	const float &getRoadWheelAngle(){return road_wheel_angle_;}
 	const uint16_t getAdcValue(){return adcValue_;}
 	void setRoadWheelAngleResolution(float val){road_wheel_angle_resolution_ = val;}
@@ -34,10 +37,15 @@ class SteerMotor
 	uint16_t generateModBusCRC_byTable(const uint8_t *ptr,uint8_t size);
 	void BufferIncomingData(uint8_t *message, int length);
 	void sendCmd(const uint8_t* buf,int len);
+	void rotate(float angle, uint8_t speed=20);
 	
 	serial::Serial *serial_port_;
 	bool is_read_serial_;
-	boost::shared_ptr<boost::thread> read_serial_thread_ptr_;
+	std::shared_ptr<std::thread> read_serial_thread_ptr_;
+	std::condition_variable condition_variable_;
+	std::mutex cv_mutex_;
+	bool use_condition_variable_;
+	
 	
 	float road_wheel_angle_;
 	uint16_t adcValue_;

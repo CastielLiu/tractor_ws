@@ -23,12 +23,14 @@ class BaseControl
 	void run();
   private:
 	void cmd_callback(const driverless_msgs::ControlCmd::ConstPtr& cmd);
+	void getMotorStatus_callback(const ros::TimerEvent&);
 	SteerMotor steerMotor_;
 	std::string steerMotor_port_name_;
 	
 	ros::Subscriber sub_cmd_;
 	ros::Publisher pub_msgs_;
 	driverless_msgs::ControlCmd cmd_;
+	ros::Timer getSystemData_timer_;
 };
 
 BaseControl::BaseControl()
@@ -62,11 +64,15 @@ bool BaseControl::init()
 	steerMotor_.enable(); //?
 	steerMotor_.startReadSerial();
 	
+	getSystemData_timer_ = 
+	    nh.createTimer(ros::Duration(0.1), &BaseControl::getMotorStatus_callback, this);
+	
 	ROS_INFO("[%s] waiting for steering motor enable...",__NAME__);
 	
 	while(ros::ok() && !steerMotor_.is_enabled())
 	{
-	    ros::Duration(0.1).sleep();
+	    ros::Duration(0.5).sleep();
+	    ROS_INFO("[%s] waiting for steering motor enable...",__NAME__);
 	    steerMotor_.enable();
 	}
 	
@@ -76,6 +82,20 @@ bool BaseControl::init()
 	sub_cmd_ = nh.subscribe(cmd_topic, 1, &BaseControl::cmd_callback, this);
 	return true;
 	
+}
+
+void BaseControl::getMotorStatus_callback(const ros::TimerEvent&)
+{
+    steerMotor_.requestAdcValue();
+    ros::Duration(0.002).sleep();
+    
+    steerMotor_.requestEnableStatus();
+    ros::Duration(0.002).sleep();
+    
+    steerMotor_.requestErrorMsg();
+    ros::Duration(0.002).sleep();
+    
+    steerMotor_.requestMotorSpeed();
 }
 
 void BaseControl::cmd_callback(const driverless_msgs::ControlCmd::ConstPtr& msg)
@@ -94,7 +114,7 @@ void BaseControl::cmd_callback(const driverless_msgs::ControlCmd::ConstPtr& msg)
 		//stop;
 		ROS_INFO("stop!!!");
 	}
-	steerMotor_.run(msg->set_roadWheelAngle);
+	steerMotor_.setRoadWheelAngle(msg->set_roadWheelAngle);
 }
 
 
