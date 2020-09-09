@@ -8,6 +8,7 @@
 #include <condition_variable>
 #include <iostream>
 #include <unistd.h>
+#include <cmath>
 
 
 class SteerMotor
@@ -29,7 +30,9 @@ class SteerMotor
 	bool is_enabled(){return is_enabled_;}
 	void setRoadWheelAngle(float angle);
 	const float getRoadWheelAngle(){return road_wheel_angle_;}
+	const float getMotorSpeed() {return motor_speed_;}
 	const uint8_t getErrorMsg() {return error_code_;}
+	void clearErrorFlag();
 	
 	void setRoadWheelAngleResolution(float val){road_wheel_angle_resolution_ = val;}
 	void setRoadWheelAngleOffset(float offset){road_wheel_angle_offset_ = offset;}
@@ -58,6 +61,8 @@ class SteerMotor
 	    DataResponse_SetSpeed,
 	    DataResponse_SetRotate,
 	    DataResponse_SetEnable,
+	    
+	    DataResponse_ClearErrorFlag,
 	    
 	};
 	int response_data_type_;

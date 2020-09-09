@@ -1,6 +1,7 @@
 
 float32 speed
 float32 roadWheelAngle
+float32 motorSpeed
 bool steerMotorEnabled
 
 uint8 ERROR_NON = 0

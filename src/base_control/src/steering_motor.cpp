@@ -114,10 +114,11 @@ void SteerMotor::readSerialPort()
 		
 #if USE_THREAD_SYNCHRONIZE
 	    std::unique_lock<std::mutex> lck(cv_mutex_);
+//	    std::cout << "waiting...\n";
         condition_variable_.wait(lck);
-#endif
-		
+#else
 		usleep(10000);
+#endif
 		try
 		{
 			// read data
@@ -129,8 +130,9 @@ void SteerMotor::readSerialPort()
 	        output << "Error reading from serial port: " << e.what();
 	        std::cout << output.str() <<std::endl;
     	}
+//    	std::cout << "received "<< len << "bytes data" << std::endl;
     	if(len==0) continue;
-    	//else std::cout << "received "<< len << "bytes data" << std::endl;
+    	
     	
 		// add data to the buffer to be parsed
 		
@@ -153,7 +155,7 @@ void SteerMotor::readSerialPort()
 void SteerMotor::BufferIncomingData(uint8_t *message, int length)
 {
 	static int bufferIndex = 0;
-	static const int MaxPkgLen = 10;
+	static const int MaxPkgLen = 15;
 	static int dataLength =0;
 	static int dataRemaind =0;
 	static uint8_t pkg_buffer[MaxPkgLen];
@@ -168,7 +170,7 @@ void SteerMotor::BufferIncomingData(uint8_t *message, int length)
 			bufferIndex = 0;
 			
 		uint8_t data = message[i];
-		
+//		std::cout << "bufferIndex: " << bufferIndex << "\n";
 		if(0 == bufferIndex)
 		{
 			if(data == 0x01) //device id
@@ -186,7 +188,6 @@ void SteerMotor::BufferIncomingData(uint8_t *message, int length)
 		    pkg_buffer[bufferIndex++] = data;
 		    dataLength = pkg_buffer[bufferIndex-1];
 //			std::cout << " dataLength : " << dataLength << "\n";
-				
 		}
 		else if(2+dataLength+2 == bufferIndex) //2(id,cmd) +dataLen +2(crcLen)
 		{
@@ -204,8 +205,9 @@ void SteerMotor::BufferIncomingData(uint8_t *message, int length)
 			//判断校验位
 			if((check_num&0xff)==pkg_buffer[bufferIndex-1] && (check_num>>8)==pkg_buffer[bufferIndex])
 			{
-#if USE_THREAD_SYNCHRONIZE
+            #if USE_THREAD_SYNCHRONIZE
                 uint16_t rawVal = pkg_buffer[3]*256 + pkg_buffer[4];
+                
                 
                 if(response_data_type_ == DataResponse_AdcValue)
 					road_wheel_angle_ = 1.0 * rawVal * road_wheel_angle_resolution_ + road_wheel_angle_offset_;
@@ -219,7 +221,7 @@ void SteerMotor::BufferIncomingData(uint8_t *message, int length)
                 else if(response_data_type_ == DataResponse_ErrorMsg)
                     error_code_ = rawVal;
 
-#else
+            #else
 				if(2 == dataLength)//adcValue
 				{
 					uint16_t adcValue = pkg_buffer[3]*256 + pkg_buffer[4];
@@ -230,11 +232,11 @@ void SteerMotor::BufferIncomingData(uint8_t *message, int length)
 				else if(6 == dataLength) //motor_speed
 					motor_speed_ = pkg_buffer[3]*256+pkg_buffer[4];
 				else if(8 == dataLength) //ErrorMsg
-					error_code_ = pkg_buffer[4];
-#endif
+					error_code_ = pkg_buffer[3]*256+pkg_buffer[4];
+            #endif
 			}
 			else
-				printf("check failed ~");
+				std::cout << "check failed ~\n"; 
 			
 			//状态索引置零
 			bufferIndex = 0;
@@ -307,7 +309,7 @@ void SteerMotor::setSteeringRotate(float cycleNum)
 	
 	int pulseNum = -cycleNum*32768;
 	
-	std::cout << "pulseNum: " << pulseNum << std::endl;
+	//std::cout << "pulseNum: " << pulseNum << std::endl;
 	
 	if(pulseNum < 0)
 		steeringRotateCmd[3] = 0x36; //clock wise ID
@@ -419,6 +421,20 @@ void SteerMotor::requestErrorMsg()
 	sendCmd(getErrorMsgCmd,8);
 }
 
+void SteerMotor::clearErrorFlag()
+{
+    static uint8_t clear_cmd[8] = {0x01,0x06,0x01,0x31,0x00,0x08};
+    
+    uint16_t CRC_checkNum = generateModBusCRC_byTable(clear_cmd,6);
+	clear_cmd[6] = CRC_checkNum &0xff;
+	clear_cmd[7] = CRC_checkNum >>8;
+#if USE_THREAD_SYNCHRONIZE
+    std::unique_lock<std::mutex> lck(cv_mutex_);
+    response_data_type_ = DataResponse_ClearErrorFlag;
+#endif
+	sendCmd(clear_cmd,8);
+}
+
 
 uint16_t SteerMotor::generateModBusCRC_byTable(const uint8_t *ptr,uint8_t size)
 {
@@ -437,15 +453,29 @@ uint16_t SteerMotor::generateModBusCRC_byTable(const uint8_t *ptr,uint8_t size)
 
 void SteerMotor::setRoadWheelAngle(float angle)
 {
+    static uint8_t rotate_speed_min = 10;
+    static uint8_t rotate_speed_max = 40;
+    static float angle_diff_max = 40; //deg
+    
     float angle_diff = angle - road_wheel_angle_;
-    std::cout << "now: " << road_wheel_angle_ << "\texpect: " << angle << "\tdiff:"<<  angle_diff << std::endl;
-    this->rotate(angle_diff);
+    
+    //根据角度偏差大小调节转速
+    uint8_t rotate_speed = fabs(angle_diff)/angle_diff_max *(rotate_speed_max-rotate_speed_min) + rotate_speed_min;
+    
+    this->rotate(angle_diff, rotate_speed);
+    
+//    std::cout << "now: " << road_wheel_angle_ 
+//              << "\texpect: " << angle 
+//              << "\tdiff:"<<  angle_diff 
+//              << "\tspeed: " << int(rotate_speed) << std::endl;
 }
 
+//the default speed is 20
 void SteerMotor::rotate(float angle, uint8_t speed)
 {
-	//deg roadWheelAngle -> 1 cycle of steeringMotor
-	static const float degreePerCycle = 20.0;
+    //degreePerCycle 前轮转动一度对应的电机脉冲数，需要标定
+	//x deg roadWheelAngle -> 1 cycle of steeringMotor
+	static const float degreePerCycle = 10; //20
 	float cycleNum = angle / degreePerCycle;
 	
 	if(motor_speed_ != speed)
