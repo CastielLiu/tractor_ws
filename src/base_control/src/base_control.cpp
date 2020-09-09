@@ -104,6 +104,7 @@ bool BaseControl::init()
 bool BaseControl::clearMotorErrors(std_srvs::Empty::Request& , std_srvs::Empty::Response&)
 {
     steerMotor_.clearErrorFlag();
+    return true;
 }
 
 void BaseControl::requestMotorStatus()
