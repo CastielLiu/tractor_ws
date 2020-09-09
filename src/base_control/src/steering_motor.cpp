@@ -21,21 +21,19 @@ static const uint16_t CRC16Table[]={
 0x4400, 0x84c1, 0x8581, 0x4540, 0x8701, 0x47c0, 0x4680, 0x8641, 0x8201, 0x42c0, 0x4380, 0x8341, 0x4100, 0x81c1, 0x8081,
 0x4040};
 
-
+#define USE_THREAD_SYNCHRONIZE 1
 #define MAX_LOAD_SIZE 100
 static uint8_t raw_buffer[MAX_LOAD_SIZE];
 
-
 SteerMotor::SteerMotor()
 {
-    use_condition_variable_ = false;
 	serial_port_ = NULL;
 	is_read_serial_ = false;
 	road_wheel_angle_ = 0.0;
 	road_wheel_angle_resolution_ = 180.0/4096;
 	road_wheel_angle_offset_ = 0.0; //前轮转角偏移值
 	is_enabled_ = false;
-	errorMsg_ = 0x00;
+	error_code_ = 0x00;
 }
 
 SteerMotor::~SteerMotor()
@@ -114,11 +112,10 @@ void SteerMotor::readSerialPort()
 	{
 		int len = 0;
 		
-		if(use_condition_variable_)
-		{
-		    std::unique_lock<std::mutex> lck(cv_mutex_);
-            condition_variable_.wait(lck);
-		}
+#if USE_THREAD_SYNCHRONIZE
+	    std::unique_lock<std::mutex> lck(cv_mutex_);
+        condition_variable_.wait(lck);
+#endif
 		
 		usleep(10000);
 		try
@@ -204,31 +201,55 @@ void SteerMotor::BufferIncomingData(uint8_t *message, int length)
 //			std::cout << std::hex << (check_num&0xff) << "\t"<< (check_num>>8)  << std::endl;
 //			std::cout << std::hex << int(pkg_buffer[bufferIndex]) << "\t" << int(pkg_buffer[bufferIndex-1]);
 			
-			
+			//判断校验位
 			if((check_num&0xff)==pkg_buffer[bufferIndex-1] && (check_num>>8)==pkg_buffer[bufferIndex])
 			{
+#if USE_THREAD_SYNCHRONIZE
+                uint16_t rawVal = pkg_buffer[3]*256 + pkg_buffer[4];
+                
+                if(response_data_type_ == DataResponse_AdcValue)
+					road_wheel_angle_ = 1.0 * rawVal * road_wheel_angle_resolution_ + road_wheel_angle_offset_;
+					
+                else if(response_data_type_ == DataResponse_EnableStatus)
+                    is_enabled_ = (rawVal>0);
+                    
+                else if(response_data_type_ == DataResponse_MotorSpeed)
+                    motor_speed_ = rawVal;
+                    
+                else if(response_data_type_ == DataResponse_ErrorMsg)
+                    error_code_ = rawVal;
+
+#else
 				if(2 == dataLength)//adcValue
 				{
-					adcValue_ = pkg_buffer[3]*256 + pkg_buffer[4];
-					//std::cout << "adcValue: " << std::dec <<adcValue_ << std::endl;
-					road_wheel_angle_ = 1.0 * adcValue_ * road_wheel_angle_resolution_ + road_wheel_angle_offset_;
+					uint16_t adcValue = pkg_buffer[3]*256 + pkg_buffer[4];
+					road_wheel_angle_ = 1.0 * adcValue * road_wheel_angle_resolution_ + road_wheel_angle_offset_;
 				}
 				else if(4 == dataLength) //enableStatus
 					is_enabled_ = (pkg_buffer[4] >0);
 				else if(6 == dataLength) //motor_speed
 					motor_speed_ = pkg_buffer[3]*256+pkg_buffer[4];
 				else if(8 == dataLength) //ErrorMsg
-					errorMsg_ = pkg_buffer[4];
-				
+					error_code_ = pkg_buffer[4];
+#endif
 			}
 			else
 				printf("check failed ~");
 			
+			//状态索引置零
 			bufferIndex = 0;
 		}
 		else
 			pkg_buffer[bufferIndex++] = data;
 	}
+}
+
+void SteerMotor::sendCmd(const uint8_t* buf,int len)
+{
+	serial_port_->write(buf,len);
+#if USE_THREAD_SYNCHRONIZE
+	condition_variable_.notify_one();
+#endif
 }
 
 void SteerMotor::setSteeringSpeed(uint8_t speed)
@@ -245,13 +266,14 @@ void SteerMotor::setSteeringSpeed(uint8_t speed)
 	CRC_checkNum = generateModBusCRC_byTable(steeringSpeedCmd,6);
 	steeringSpeedCmd[6] = CRC_checkNum &0xff;
 	steeringSpeedCmd[7] = CRC_checkNum >>8;
+
+#if USE_THREAD_SYNCHRONIZE
+    std::unique_lock<std::mutex> lck(cv_mutex_);
+    response_data_type_ = DataResponse_SetSpeed;
+#endif
 	sendCmd(steeringSpeedCmd,8);
 }
 
-void SteerMotor::sendCmd(const uint8_t* buf,int len)
-{
-	serial_port_->write(buf,len);
-}
 
 void SteerMotor::enable()
 {
@@ -261,12 +283,20 @@ void SteerMotor::enable()
 	//										                     				  0x01 //enable
 	//											                    			  0x00 //disable
 	const uint8_t steeringEnableCmd[11]={0x01,0x10,0x00,0x33,0x00,0x01,0x02,0x00,0x01,0x62,0x53};
+#if USE_THREAD_SYNCHRONIZE
+    std::unique_lock<std::mutex> lck(cv_mutex_);
+    response_data_type_ = DataResponse_SetEnable;
+#endif
 	sendCmd(steeringEnableCmd,11);
 }
 
 void SteerMotor::disable()
 {
 	const uint8_t steeringDisableCmd[11]={0x01,0x10,0x00,0x33,0x00,0x01,0x02,0x00,0x00,0xA3,0x93};
+#if USE_THREAD_SYNCHRONIZE
+    std::unique_lock<std::mutex> lck(cv_mutex_);
+    response_data_type_ = DataResponse_SetEnable;
+#endif
 	sendCmd(steeringDisableCmd, 11);
 }
 
@@ -291,7 +321,118 @@ void SteerMotor::setSteeringRotate(float cycleNum)
 	uint16_t CRC_checkNum = generateModBusCRC_byTable(steeringRotateCmd,11);
 	steeringRotateCmd[11] = CRC_checkNum &0xff;
 	steeringRotateCmd[12] = CRC_checkNum >>8;
+	
+#if USE_THREAD_SYNCHRONIZE
+    std::unique_lock<std::mutex> lck(cv_mutex_);
+    response_data_type_ = DataResponse_SetRotate;
+#endif
 	sendCmd(steeringRotateCmd,13);
+}
+
+void SteerMotor::requestAdcValue()
+{
+    //0x01 设备ID
+    //0x03 读寄存器
+    //0x40,0x0D 寄存器地址
+    //0x00,0x01 寄存器长度，读1个字节
+    //0x00,0x09 CRC16
+	static const uint8_t getAdcValueCmd[8]  = {0x01,0x03,0x40,0x0D,0x00,0x01,0x00,0x09}; 
+		//response-> 01 03 02 {0A 32} 3F 31  16bits AD value
+		
+#if USE_THREAD_SYNCHRONIZE
+    std::unique_lock<std::mutex> lck(cv_mutex_);
+    response_data_type_ = DataResponse_AdcValue;
+#endif
+	sendCmd(getAdcValueCmd,8);
+	
+}
+
+void SteerMotor::requestEnableStatus()
+{
+    //0x01 设备ID
+    //0x03 读寄存器
+    //0x00,0x33 使能状态寄存器地址
+    //0x00,0x02 读取寄存器长度，读2个单位
+#if USE_THREAD_SYNCHRONIZE
+    uint8_t cmd[8] = {0x01,0x03,0x00,0x33,0x00,0x01};  //读取一个单位
+#else
+	uint8_t cmd[8] = {0x01,0x03,0x00,0x33,0x00,0x02};
+#endif
+	
+	uint16_t CRC_checkNum = generateModBusCRC_byTable(cmd,6);
+	cmd[6] = CRC_checkNum & 0xff;
+	cmd[7] = CRC_checkNum >>8;
+	
+#if USE_THREAD_SYNCHRONIZE
+    std::unique_lock<std::mutex> lck(cv_mutex_);
+    response_data_type_ = DataResponse_EnableStatus;
+#endif
+	sendCmd(cmd,8);
+}
+
+void SteerMotor::requestMotorSpeed()
+{
+    //0x01 设备ID
+    //0x03 读寄存器
+    //0x00,0x6A 转速寄存器地址
+    //0x00,0x03 读取寄存器长度，读3个字节
+    
+#if USE_THREAD_SYNCHRONIZE
+    uint8_t cmd[8] = {0x01,0x03,0x00,0x6A,0x00,0x01};  //读取一个单位
+#else
+	uint8_t cmd[8] = {0x01,0x03,0x00,0x6A,0x00,0x03};
+#endif
+
+	uint16_t CRC_checkNum = generateModBusCRC_byTable(cmd,6);
+	cmd[6] = CRC_checkNum & 0xff;
+	cmd[7] = CRC_checkNum >>8;
+	
+#if USE_THREAD_SYNCHRONIZE
+    std::unique_lock<std::mutex> lck(cv_mutex_);
+    response_data_type_ = DataResponse_MotorSpeed;
+#endif
+	sendCmd(cmd,8);
+}
+
+void SteerMotor::requestErrorMsg()
+{
+    //0x01 设备ID
+    //0x03 读寄存器
+    //0x01,0x1F 转速寄存器地址
+    //0x00,0x04 读取寄存器长度，读4个字节
+
+#if USE_THREAD_SYNCHRONIZE
+    uint8_t getErrorMsgCmd[8] = {0x01,0x03,0x01,0x1F,0x00,0x01};
+#else
+	uint8_t getErrorMsgCmd[8] = {0x01,0x03,0x01,0x1F,0x00,0x04};
+#endif
+
+	uint16_t CRC_checkNum = generateModBusCRC_byTable(getErrorMsgCmd,6);
+	getErrorMsgCmd[6] = CRC_checkNum & 0xff;
+	getErrorMsgCmd[7] = CRC_checkNum >>8;
+	
+	
+#if USE_THREAD_SYNCHRONIZE
+    std::unique_lock<std::mutex> lck(cv_mutex_);
+    response_data_type_ = DataResponse_ErrorMsg;
+#endif
+	sendCmd(getErrorMsgCmd,8);
+}
+
+
+uint16_t SteerMotor::generateModBusCRC_byTable(const uint8_t *ptr,uint8_t size)
+{
+	uint16_t CRC16  = 0xffff;
+    uint16_t tableNo = 0;
+	int i = 0;
+ 
+    for( ; i < size; i++)
+    {
+        tableNo = ((CRC16 & 0xff) ^ (ptr[i] & 0xff));
+        CRC16  = ((CRC16 >> 8) & 0xff) ^ CRC16Table[tableNo];
+    }
+ 
+    return CRC16;  
 }
 
 void SteerMotor::setRoadWheelAngle(float angle)
@@ -315,82 +456,5 @@ void SteerMotor::rotate(float angle, uint8_t speed)
 	
 	setSteeringRotate(cycleNum);
 }
-
-void SteerMotor::requestAdcValue()
-{
-    //0x01 设备ID
-    //0x03 读寄存器
-    //0x40,0x0D 寄存器地址
-    //0x00,0x01 寄存器长度，读1个字节
-    //0x00,0x09 CRC16
-	static const uint8_t getAdcValueCmd[8]  = {0x01,0x03,0x40,0x0D,0x00,0x01,0x00,0x09}; 
-		//response-> 01 03 02 {0A 32} 3F 31  16bits AD value
-	sendCmd(getAdcValueCmd,8);
-	
-	if(use_condition_variable_)
-	    condition_variable_.notify_one();
-}
-
-void SteerMotor::requestEnableStatus()
-{
-    //0x01 设备ID
-    //0x03 读寄存器
-    //0x00,0x33 使能状态寄存器地址
-    //0x00,0x02 读取寄存器长度，读2个字节
-    
-	uint8_t cmd[8] = {0x01,0x03,0x00,0x33,0x00,0x02};
-	uint16_t CRC_checkNum = generateModBusCRC_byTable(cmd,6);
-	cmd[6] = CRC_checkNum & 0xff;
-	cmd[7] = CRC_checkNum >>8;
-	sendCmd(cmd,8);
-	if(use_condition_variable_)
-	    condition_variable_.notify_one();
-}
-
-void SteerMotor::requestMotorSpeed()
-{
-    //0x01 设备ID
-    //0x03 读寄存器
-    //0x00,0x6A 转速寄存器地址
-    //0x00,0x03 读取寄存器长度，读3个字节
-	uint8_t cmd[8] = {0x01,0x03,0x00,0x6A,0x00,0x03};
-	uint16_t CRC_checkNum = generateModBusCRC_byTable(cmd,6);
-	cmd[6] = CRC_checkNum & 0xff;
-	cmd[7] = CRC_checkNum >>8;
-	sendCmd(cmd,8);
-	if(use_condition_variable_)
-	    condition_variable_.notify_one();
-}
-
-void SteerMotor::requestErrorMsg()
-{
-    //0x01 设备ID
-    //0x03 读寄存器
-    //0x01,0x1F 转速寄存器地址
-    //0x00,0x04 读取寄存器长度，读4个字节
-	uint8_t getErrorMsgCmd[8] = {0x01,0x03,0x01,0x1F,0x00,0x04};
-	uint16_t CRC_checkNum = generateModBusCRC_byTable(getErrorMsgCmd,6);
-	getErrorMsgCmd[6] = CRC_checkNum & 0xff;
-	getErrorMsgCmd[7] = CRC_checkNum >>8;
-	sendCmd(getErrorMsgCmd,8);
-	if(use_condition_variable_)
-	    condition_variable_.notify_one();
-}
-
-
-uint16_t SteerMotor::generateModBusCRC_byTable(const uint8_t *ptr,uint8_t size)
-{
-	uint16_t CRC16  = 0xffff;
-    uint16_t tableNo = 0;
-	int i = 0;
- 
-    for( ; i < size; i++)
-    {
-        tableNo = ((CRC16 & 0xff) ^ (ptr[i] & 0xff));
-        CRC16  = ((CRC16 >> 8) & 0xff) ^ CRC16Table[tableNo];
-    }
- 
-    return CRC16;  
-} 
 
 

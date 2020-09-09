@@ -9,6 +9,7 @@
 #include <iostream>
 #include <unistd.h>
 
+
 class SteerMotor
 {
   public:
@@ -28,8 +29,7 @@ class SteerMotor
 	bool is_enabled(){return is_enabled_;}
 	void setRoadWheelAngle(float angle);
 	const float getRoadWheelAngle(){return road_wheel_angle_;}
-	const uint16_t getAdcValue(){return adcValue_;}
-	const uint8_t getErrorMsg() {return errorMsg_;}
+	const uint8_t getErrorMsg() {return error_code_;}
 	
 	void setRoadWheelAngleResolution(float val){road_wheel_angle_resolution_ = val;}
 	void setRoadWheelAngleOffset(float offset){road_wheel_angle_offset_ = offset;}
@@ -44,19 +44,32 @@ class SteerMotor
 	serial::Serial *serial_port_;
 	bool is_read_serial_;
 	std::shared_ptr<std::thread> read_serial_thread_ptr_;
+	
+	//+线程同步相关变量
 	std::condition_variable condition_variable_;
 	std::mutex cv_mutex_;
-	bool use_condition_variable_;
-	
+	enum DataResponseType
+	{
+	    DataResponse_EnableStatus,
+	    DataResponse_AdcValue,
+	    DataResponse_MotorSpeed,
+	    DataResponse_ErrorMsg,
+	    
+	    DataResponse_SetSpeed,
+	    DataResponse_SetRotate,
+	    DataResponse_SetEnable,
+	    
+	};
+	int response_data_type_;
+	//-线程同步相关变量
 	
 	float road_wheel_angle_;
-	uint16_t adcValue_;
 	
 	float road_wheel_angle_resolution_;
 	float road_wheel_angle_offset_;
 	bool is_enabled_;
 	float motor_speed_;
-	uint8_t errorMsg_;
+	uint8_t error_code_;
 };
 
 #endif
