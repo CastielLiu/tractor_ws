@@ -6,10 +6,13 @@
 #include<nav_msgs/Odometry.h>
 #include <interface/DriverlessStatus.h>
 #include <interface/Driverless.h>
-//#include <>
+
+#include <auto_drive/DoAutoDriveAction.h>
+#include <actionlib/server/simple_action_server.h>
 #include"ros/ros.h"
 
 namespace fs = boost::filesystem;
+typedef actionlib::SimpleActionServer<auto_drive::DoAutoDriveAction> DoAutoDriveActionServer;
 
 class AutoDrive 
 {
@@ -24,6 +27,8 @@ class AutoDrive
     bool driverlessService(interface::Driverless::Request  &req,
 									 interface::Driverless::Response &res);
 	bool callDriverlessStatusService(uint8_t status);
+	
+	void doAutoDriveCb(const auto_drive::DoAutoDriveGoalConstPtr& goal);
 
   private: 
     float max_speed_;
@@ -51,6 +56,9 @@ class AutoDrive
 
     PathTracking tracker_;
     Avoiding avoider_;
+    
+    //actionlib
+    DoAutoDriveActionServer *as_auto_drive_;
 
 };
 

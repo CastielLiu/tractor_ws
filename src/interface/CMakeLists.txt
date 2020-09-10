@@ -13,6 +13,7 @@ find_package(catkin REQUIRED COMPONENTS
 	std_msgs
 	gps_msgs
 	message_generation
+	actionlib_msgs
 )
 
 add_service_files(
