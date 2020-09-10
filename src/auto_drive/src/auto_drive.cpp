@@ -61,7 +61,7 @@ bool AutoDrive::init()
     srv_driverless_ = nh_.advertiseService("driverless_service",&AutoDrive::driverlessService,this);
 	driverless_status_client_nh_ = nh_.serviceClient<interface::DriverlessStatus>("driverlessStatus_service");
 	
-	as_auto_drive_ = new DoAutoDriveActionServer(ros::NodeHandle(), "do_auto_drive", boost::bind(&AutoDrive::doAutoDriveCb, this, _1), false);
+	as_auto_drive_ = new DoAutoDriveActionServer(nh_, "do_auto_drive", boost::bind(&AutoDrive::doAutoDriveCb, this, _1), false);
 }
 
 void AutoDrive::doAutoDriveCb(const auto_drive::DoAutoDriveGoalConstPtr& goal)
