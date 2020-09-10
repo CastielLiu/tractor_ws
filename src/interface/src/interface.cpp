@@ -45,8 +45,11 @@ bool Interface::init()
 	client_recordPath_ = nh.serviceClient<interface::RecordPath>("record_path_service");
 	//创建自动驾驶服务客户端
 	client_driverless_ = nh.serviceClient<interface::Driverless>("driverless_service");
+	//创建清除转向电机错误代码客户端
+	client_clearMotorError_ = nh.serviceClient<std_srvs::Empty>("clear_motor_error_flag");
+	
 	//创建自动驾驶状态服务端
-	driverless_status_srv_nh_ = nh.advertiseService("driverlessStatus_service",&Interface::driverlessStatusService, this);
+	server_driverless_status_ = nh.advertiseService("driverlessStatus_service",&Interface::driverlessStatusService, this);
 	
 	nh_private.param<std::string>("can2serial_port",can2serial_port_,"");
 	nh_private.param<int>("can_baudrate",can_baudrate_,250);
@@ -94,7 +97,7 @@ void Interface::readCanMsg()
 		switch(can_msg.ID)
 		{
 			int file_seq;
-			case RECORD_PATH_CAN_ID: //记录路径can消息
+			case RECORD_PATH_CAN_ID: //请求记录路径can消息
 				file_seq = can_msg.data[1]*256 + can_msg.data[0];
 				srv_record_path_.request.path_type = can_msg.data[2];
 				srv_record_path_.request.path_file_name = std::to_string(file_seq)+"_" 
@@ -109,7 +112,7 @@ void Interface::readCanMsg()
 				can_msg_response.data[1] = srv_record_path_.response.success;
 				can2serial_->sendCanMsg(can_msg_response); //response
 				break;
-			case DRIVERLESS_CAN_ID://自动驾驶can消息
+			case DRIVERLESS_CAN_ID://请求自动驾驶can消息
 				srv_driverless_.request.command_type = can_msg.data[3];
 				srv_driverless_.request.path_type = can_msg.data[2];
 				file_seq = can_msg.data[1]*256 + can_msg.data[0];
@@ -126,8 +129,16 @@ void Interface::readCanMsg()
 				can_msg_response.data[1] = srv_driverless_.response.success;
 				can2serial_->sendCanMsg(can_msg_response); //response
 				break;
+			
+			case RESET_CAN_ID: //系统复位
+			{
+			    std_srvs::Empty empty;
+			    client_clearMotorError_.call(empty);
+			    break;
+			}
+			
 			default:
-				ROS_ERROR("[%s] Unkown can ID." __NAME__);
+				ROS_ERROR("[%s] Unknown CAN ID." __NAME__);
 				break;
 		}
 	}

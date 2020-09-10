@@ -11,6 +11,7 @@
 #include <interface/RecordPath.h>
 #include <interface/Driverless.h>
 #include <interface/DriverlessStatus.h>
+#include <std_srvs/Empty.h>
 
 class Interface
 {
@@ -28,11 +29,12 @@ class Interface
 	bool driverlessStatusService(interface::DriverlessStatus::Request &req, interface::DriverlessStatus::Response &res);
 	enum 
 	{
-		GPS_CAN_ID = 0x301,
-		STATUS_CAN_ID = 0x302,
-		RECORD_PATH_CAN_ID = 0x200,
-		DRIVERLESS_CAN_ID = 0x201,
-		RESPONSE_CAN_ID = 0x205,
+		GPS_CAN_ID = 0x301,          //定位信息上报
+		STATUS_CAN_ID = 0x302,       //车辆状态上报
+		RECORD_PATH_CAN_ID = 0x200,  //请求记录路径
+		DRIVERLESS_CAN_ID = 0x201,   //请求自动驾驶
+		RESPONSE_CAN_ID = 0x205,     //应答报文
+		RESET_CAN_ID = 0x206,        //系统复位(清除转向电机错误代码)
 	};
 	struct Informathion
 	{
@@ -57,13 +59,19 @@ class Interface
 	ros::Timer timer_;
 	
 	boost::shared_ptr<boost::thread> read_canMsg_thread_;
+	
 	ros::ServiceClient client_recordPath_;
 	interface::RecordPath srv_record_path_;
 	
 	ros::ServiceClient client_driverless_;
 	interface::Driverless srv_driverless_;
 	
-	ros::ServiceServer driverless_status_srv_nh_;
+	ros::ServiceServer server_driverless_status_;
+	ros::ServiceClient client_clearMotorError_;
+	//清除转向电机错误代码
+	
+
+	
 };
 
 
