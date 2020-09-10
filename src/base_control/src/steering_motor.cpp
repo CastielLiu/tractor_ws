@@ -435,6 +435,20 @@ void SteerMotor::clearErrorFlag()
 	sendCmd(clear_cmd,8);
 }
 
+void SteerMotor::reboot()
+{
+    static uint8_t cmd[8] = {0x01,0x06,0x01,0x31,0x00,0x2E};
+    
+    uint16_t CRC_checkNum = generateModBusCRC_byTable(cmd,6);
+	cmd[6] = CRC_checkNum &0xff;
+	cmd[7] = CRC_checkNum >>8;
+#if USE_THREAD_SYNCHRONIZE
+    std::unique_lock<std::mutex> lck(cv_mutex_);
+    response_data_type_ = DataResponse_Reboot;
+#endif
+	sendCmd(cmd,8);
+}
+
 
 uint16_t SteerMotor::generateModBusCRC_byTable(const uint8_t *ptr,uint8_t size)
 {

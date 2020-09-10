@@ -53,7 +53,7 @@ bool BaseControl::init()
 {
 	ros::NodeHandle nh;
 	ros::NodeHandle nh_private("~");
-	nh_private.param<std::string>("steerMotor_port_name",steerMotor_port_name_,"/dev/ttyUSB0");
+	nh_private.param<std::string>("steering_port",steerMotor_port_name_,"/dev/ttyUSB0");
 	
 	float road_wheel_angle_offset, road_wheel_angle_resolution;
 	nh_private.param<float>("road_wheel_angle_offset",road_wheel_angle_offset,0.0);
@@ -63,7 +63,7 @@ bool BaseControl::init()
 	
 	if(!steerMotor_.init(steerMotor_port_name_,115200))
 	{
-	    ROS_ERROR("[%s] init steering motor serial port failed.");
+	    ROS_ERROR("[%s] init steering motor serial port failed.", __NAME__);
 		return false;
 	}
 	steerMotor_.startReadSerial();

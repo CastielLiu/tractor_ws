@@ -33,6 +33,7 @@ class SteerMotor
 	const float getMotorSpeed() {return motor_speed_;}
 	const uint8_t getErrorMsg() {return error_code_;}
 	void clearErrorFlag();
+	void reboot();
 	
 	void setRoadWheelAngleResolution(float val){road_wheel_angle_resolution_ = val;}
 	void setRoadWheelAngleOffset(float offset){road_wheel_angle_offset_ = offset;}
@@ -63,6 +64,7 @@ class SteerMotor
 	    DataResponse_SetEnable,
 	    
 	    DataResponse_ClearErrorFlag,
+	    DataResponse_Reboot,
 	    
 	};
 	int response_data_type_;

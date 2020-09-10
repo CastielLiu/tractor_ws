@@ -1,30 +1,50 @@
 <!-- -->
 <launch>
-
+    <arg name="upper_port" value="/dev/ttyUSB0"/>
+    <arg name="gps_port" value="/dev/ttyUSB1"/>
+    <arg name="steering_port" value="/dev/ttyUSB2"/>
+    
+    <arg name="gps_topic" value="/gps_odom"/>
+    <arg name="cmd_topic" value="/tractor_cmd"/>
+    <arg name="file_path" value="$(find record_path)/data"/>
+    
 	<node name="interface_node" pkg="interface" type="interface_node" output="screen">
-	    <param name="utm_topic" value="/ll2utm" />
-		<param name="can2serial_port" value="/dev/ttyUSB0"/>
+	    <param name="utm_topic" value="/ll2utm"/>
+		<param name="can2serial_port" value="$(arg upper_port)"/>
 		<param name="can_baudrate" value="250"/>
 	</node>
 	
-	<node name="path_tracking" pkg="path_tracking" type="path_tracking_node" output="screen">
-		<param name="path_file_dir" value="$(find record_path)/data"/>
+	<node name="auto_drive_node" pkg="auto_drive" type="auto_drive_node" output="screen">
+	    <param name="utm_topic" value="$(arg gps_topic)"/>  
+		<param name="path_file_dir" value="$(arg file_path)"/>
 		<param name="foreSightDis_speedCoefficient" value="1.8"/>
 		<param name="foreSightDis_speedCoefficient" value="1.8"/>
 		<param name="min_foresight_distance" value="5.0"/>
-		<param name="wheel_base" value="1.5"/>
+		<param name="wheel_base" value="2.0"/>
+		
+		<param name="cmd_topic" value="$(arg cmd_topic)"/>
 	</node>
 	
+	<!-- record_path -->
 	<node name="record_path_node" pkg="record_path" type="record_path_node" output="screen">
-	    <param name="utm_topic" value="/ll2utm" />
-		<param name="file_path" value="$(find record_path)/data/"/>
+	    <param name="utm_topic" value="$(arg gps_topic)" />
+		<param name="file_path" value="$(arg file_path)"/>
 		<param name="sample_distance" value="0.1"/>
 	</node>
 	
+	<!-- gps -->
 	<node name="nuogeng_node" pkg="nuogeng" type="nuogeng_node" output="screen">
-		<param name="port_name" value="/dev/ttyUSB1"/>
+		<param name="port_name" value="$(arg gps_port)"/>
 		<param name="is_ll2utm" value="true"/>
-		<param name="odom_topic" value="/ll2utm"/>
+		<param name="odom_topic" value="$(arg gps_topic)"/>
+	</node>
+	
+	<!--base_control-->
+	<node name="base_control_node" pkg="base_control" type="base_control_node" required="true" output="screen">
+		<param name="steering_port" value="$(arg steering_port)"/>
+		<param name="road_wheel_angle_offset" value="-0"/>
+		<param name="road_wheel_angle_resolution" value="0.04"/> <!--1 adc 对应的角度值 -->
+		<param name="cmd_topic" value="$(arg cmd_topic)"/>
 	</node>
 	
 </launch>

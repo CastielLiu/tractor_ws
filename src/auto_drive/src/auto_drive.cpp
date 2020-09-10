@@ -20,6 +20,7 @@
 #define FileError       interface::Driverless::Response::PATH_FILE_ERROR
 
 #define __NAME__ "auto_drive"
+#define USE_AVOIDANCE 0
 
 AutoDrive::AutoDrive():
     nh_private_("~"),
@@ -54,14 +55,15 @@ bool AutoDrive::init()
 		ROS_INFO("[AutoDrive]: gps data is invalid, please check the gps topic or waiting...");
 		ros::Duration(0.5).sleep();
 	}
-
-    pub_cmd_ = nh_.advertise<driverless_msgs::ControlCmd>("/cmd",1);
+    std::string cmd_topic = nh_private_.param<std::string>("cmd_topic","/cmd");
+    pub_cmd_ = nh_.advertise<driverless_msgs::ControlCmd>(cmd_topic, 1);
 	update_timer_ = nh_.createTimer(ros::Duration(0.05),&AutoDrive::update_timer_callback,this);
 
     srv_driverless_ = nh_.advertiseService("driverless_service",&AutoDrive::driverlessService,this);
 	driverless_status_client_nh_ = nh_.serviceClient<interface::DriverlessStatus>("driverlessStatus_service");
 }
 
+//反馈自动驾驶状态
 bool AutoDrive::callDriverlessStatusService(uint8_t status)
 {
 	interface::DriverlessStatus srv;
@@ -147,10 +149,13 @@ void AutoDrive::autoDriveThread(float speed)
 	this->tracker_.setPath(path_);
     if(!tracker_.init(vehicle_point_))
         return;
+
+#if USE_AVOIDANCE
 	//配置避障控制器
 	avoider_.setPath(path_);
 	if(!avoider_.init()) 
 		return;
+#endif
 	
 	ros::Rate loop_rate(20);
 	
@@ -163,6 +168,7 @@ void AutoDrive::autoDriveThread(float speed)
 		}
 		if((status_ == TrackerStop) || (status_ == TrackerIdle))
 			break;
+			
 		bool update_state = tracker_.update(vehicle_speed_, roadwheel_angle_, vehicle_point_, avoid_offset_);
         if(update_state == false)
         {
@@ -181,7 +187,9 @@ void AutoDrive::autoDriveThread(float speed)
 	
 	ROS_INFO("[%s] automatic drive completed...",__NAME__); //send msg to screen ??????/
 
+#if USE_AVOIDANCE
 	avoider_.shutDown();
+#endif
 }
 
 void AutoDrive::update_timer_callback(const ros::TimerEvent&)
