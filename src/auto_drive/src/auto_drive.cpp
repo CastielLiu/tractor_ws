@@ -47,7 +47,10 @@ bool AutoDrive::init()
 		ROS_ERROR("no input path file directory !!!");
 		return false;
 	}
-	sub_utm_ = nh_.subscribe("/ll2utm",1,&AutoDrive::odom_callback,this);
+	
+	std::string utm_topic=nh_private_.param<std::string>("utm_topic","utm_topic");
+	sub_utm_ = nh_.subscribe(utm_topic, 1,&AutoDrive::odom_callback,this);
+	sub_state_ = nh_.subscribe("/state", 1, &AutoDrive::state_callback, this);
 
 	// wait for system ok
 	while(ros::ok() && !is_gps_data_valid(vehicle_point_))
@@ -237,4 +240,9 @@ void AutoDrive::odom_callback(const nav_msgs::Odometry::ConstPtr& msg)
 	
 	vehicle_point_.longitude = msg->pose.covariance[1];
 	vehicle_point_.latitude = msg->pose.covariance[2];
+}
+
+void AutoDrive::state_callback(const driverless_msgs::State::ConstPtr& msg)
+{
+    roadwheel_angle_ = msg->roadWheelAngle;
 }

@@ -84,6 +84,7 @@ bool PathTracking::update(float speed, float road_wheelangle,  //vehicle state
 						 const gpsMsg_t& vehicle_point,      //vehicle positoin
 						 const float& path_offset)
 {
+    current_pos_ = vehicle_point;
 	vehicle_speed_ = speed;
 	road_wheelangle_ = road_wheelangle;
 
@@ -112,22 +113,23 @@ bool PathTracking::update(float speed, float road_wheelangle,  //vehicle state
 	if(yaw_err==0.0)
 		return true;
 	
-	float turning_radius = (-0.5 * dis_yaw.first)/sin(yaw_err);
+	float turning_radius = (0.5 * dis_yaw.first)/sin(yaw_err);
 
 	t_roadwheel_angle_ = generateRoadwheelAngleByRadius(turning_radius, wheel_base_);
 	
+	//跟踪完成
 	if(nearest_point_index_ > destination_index_-10)
 	{
 		t_speed_ = 0.0;
 		return false;
 	}
 	else
-		t_speed_ = 10.0; 
+		t_speed_ = 10.0;
 	
 	if(++cnt%20==0)
 	{
 		ROS_INFO("dis2target:%.2f\t yaw_err:%.2f\t lat_err:%.2f",dis_yaw.first,yaw_err*180.0/M_PI,lateral_err_);
-		ROS_INFO("disThreshold:%f\t expect roadwheel angle:%.2f",disThreshold_,road_wheelangle);
+		ROS_INFO("disThreshold:%f\t expect roadwheel angle:%.2f",disThreshold_,t_roadwheel_angle_);
 		ROS_INFO("path_offset:%f\n",path_offset);
 	}
 	this->publishInfo();
@@ -157,6 +159,8 @@ void PathTracking::publishInfo()
 	info_.target_point_index = target_point_index_;
 	info_.speed = vehicle_speed_;
 	info_.lateral_err = lateral_err_;
+	info_.latitude = current_pos_.latitude;
+	info_.longitude = current_pos_.longitude;
 
 	pub_info_.publish(info_);
 }

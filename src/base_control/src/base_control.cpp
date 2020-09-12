@@ -104,6 +104,7 @@ bool BaseControl::init()
 bool BaseControl::clearMotorErrors(std_srvs::Empty::Request& , std_srvs::Empty::Response&)
 {
     steerMotor_.clearErrorFlag();
+    //steerMotor_.reboot();
     return true;
 }
 
@@ -159,7 +160,7 @@ void BaseControl::cmd_callback(const driverless_msgs::ControlCmd::ConstPtr& msg)
 	if(msg->set_brake > 0)
 	{
 		//stop;
-		ROS_INFO("stop!!!");
+		//ROS_INFO("stop!!!");
 	}
 	
 	steerMotor_.setRoadWheelAngle(msg->set_roadWheelAngle);

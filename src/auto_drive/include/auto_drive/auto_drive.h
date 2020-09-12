@@ -6,6 +6,9 @@
 #include<nav_msgs/Odometry.h>
 #include <interface/DriverlessStatus.h>
 #include <interface/Driverless.h>
+#include <std_srvs/Empty.h>
+
+#include <driverless_msgs/State.h>
 //#include <>
 #include"ros/ros.h"
 
@@ -20,6 +23,7 @@ class AutoDrive
     void run();
     void autoDriveThread(float speed);
     void odom_callback(const nav_msgs::Odometry::ConstPtr& msg);
+    void state_callback(const driverless_msgs::State::ConstPtr& msg);
     void update_timer_callback(const ros::TimerEvent&);
     bool driverlessService(interface::Driverless::Request  &req,
 									 interface::Driverless::Response &res);
@@ -37,6 +41,7 @@ class AutoDrive
 	ros::Timer timer_;
 	ros::Publisher pub_cmd_;
     ros::Subscriber sub_utm_;
+    ros::Subscriber sub_state_;
     ros::Timer update_timer_;
 
     ros::ServiceServer srv_driverless_;

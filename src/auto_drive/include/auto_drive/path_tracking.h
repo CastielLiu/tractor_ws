@@ -48,6 +48,7 @@ private:
 	size_t nearest_point_index_;
 
 	gpsMsg_t target_point_;
+	gpsMsg_t current_pos_;
 	
 	float min_foresight_distance_;
 	float disThreshold_;

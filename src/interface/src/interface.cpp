@@ -181,7 +181,7 @@ void Interface::path_tracking_info_callback(const driverless_msgs::PathTrackingI
 bool Interface::driverlessStatusService(interface::DriverlessStatus::Request  &req,
 							 			interface::DriverlessStatus::Response &res)
 {
-	
+	ROS_INFO("[%s] auto drive complete. ",__NAME__);
 	return true;
 }
 
