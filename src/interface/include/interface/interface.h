@@ -12,6 +12,9 @@
 #include <interface/Driverless.h>
 #include <interface/DriverlessStatus.h>
 #include <std_srvs/Empty.h>
+#include <std_msgs/UInt8.h>
+#include "structs.h"
+
 
 class Interface
 {
@@ -24,39 +27,33 @@ class Interface
   private:
 	void readCanMsg();
 	void odom_callback(const nav_msgs::Odometry::ConstPtr& gps);
-	void timer_callback(const ros::TimerEvent& event);
+	void msgReport_callback(const ros::TimerEvent& event);
+	void heartbeat_callback(const ros::TimerEvent& event);
+
 	void path_tracking_info_callback(const driverless_msgs::PathTrackingInfo::ConstPtr& );
+	void steerMotorState_callback(const std_msgs::UInt8::ConstPtr& msg);
+	void driveSystemState_callback(const std_msgs::UInt8::ConstPtr& msg);
+	void brakeSystemState_callback(const std_msgs::UInt8::ConstPtr& msg);
 	bool driverlessStatusService(interface::DriverlessStatus::Request &req, interface::DriverlessStatus::Response &res);
-	enum 
-	{
-		GPS_CAN_ID = 0x301,          //定位信息上报
-		STATUS_CAN_ID = 0x302,       //车辆状态上报
-		RECORD_PATH_CAN_ID = 0x200,  //请求记录路径
-		DRIVERLESS_CAN_ID = 0x201,   //请求自动驾驶
-		RESPONSE_CAN_ID = 0x205,     //应答报文
-		RESET_CAN_ID = 0x206,        //系统复位(清除转向电机错误代码)
-	};
-	struct Informathion
-	{
-		Informathion()
-		{
-			gps.ID = GPS_CAN_ID;
-			status.ID = STATUS_CAN_ID;
-		}
-		CanMsg_t gps, status;
-	};
 	
   private:
 	Can2serial * can2serial_;
 	std::string can2serial_port_;
 	int can_baudrate_;
-	Informathion info_;
+
+	canMsgs_t info_;
 	
-	bool odom_flag_, tracking_info_flag_;
+	bool gps_odom_flag_, tracking_info_flag_;
 	
 	ros::Subscriber sub_gps_;
 	ros::Subscriber sub_pathtracking_info_;
-	ros::Timer timer_;
+	ros::Subscriber sub_steerMoter_state_;
+	ros::Subscriber sub_system_state_;
+	ros::Subscriber sub_brake_state_;
+
+
+	ros::Timer msg_report_timer_;
+	ros::Timer heartbeat_timer_;
 	
 	boost::shared_ptr<boost::thread> read_canMsg_thread_;
 	

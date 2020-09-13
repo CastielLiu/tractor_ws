@@ -23,6 +23,7 @@ class BaseControl
 	void run();
   private:
     void requestMotorStatus();
+    bool rebootMotor(std_srvs::Empty::Request& , std_srvs::Empty::Response&);
     bool clearMotorErrors(std_srvs::Empty::Request& , std_srvs::Empty::Response&);
 	void cmd_callback(const driverless_msgs::ControlCmd::ConstPtr& cmd);
 	void requestMotorStatus_callback(const ros::TimerEvent&);
@@ -104,7 +105,12 @@ bool BaseControl::init()
 bool BaseControl::clearMotorErrors(std_srvs::Empty::Request& , std_srvs::Empty::Response&)
 {
     steerMotor_.clearErrorFlag();
-    //steerMotor_.reboot();
+    return true;
+}
+
+bool BaseControl::rebootMotor(std_srvs::Empty::Request& , std_srvs::Empty::Response&)
+{
+    steerMotor_.reboot();
     return true;
 }
 

@@ -39,7 +39,8 @@ class SteerMotor
 	void setRoadWheelAngleOffset(float offset){road_wheel_angle_offset_ = offset;}
   private:
 	bool configure_port(std::string port,int baud_rate);
-	void readSerialPort();
+	void readSerialThread();
+	void requestMsgThread();
 	uint16_t generateModBusCRC_byTable(const uint8_t *ptr,uint8_t size);
 	void BufferIncomingData(uint8_t *message, int length);
 	void sendCmd(const uint8_t* buf,int len);
@@ -48,6 +49,7 @@ class SteerMotor
 	serial::Serial *serial_port_;
 	bool is_read_serial_;
 	std::shared_ptr<std::thread> read_serial_thread_ptr_;
+	std::shared_ptr<std::thread> request_msg_thread_ptr_;
 	
 	//+线程同步相关变量
 	std::condition_variable condition_variable_;

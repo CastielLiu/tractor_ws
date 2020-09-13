@@ -21,7 +21,12 @@ static const uint16_t CRC16Table[]={
 0x4400, 0x84c1, 0x8581, 0x4540, 0x8701, 0x47c0, 0x4680, 0x8641, 0x8201, 0x42c0, 0x4380, 0x8341, 0x4100, 0x81c1, 0x8081,
 0x4040};
 
+
+//是否使用线程同步机制
+//不使用线程同步时，通过返回数据长度进行判断
 #define USE_THREAD_SYNCHRONIZE 1
+
+
 #define MAX_LOAD_SIZE 100
 static uint8_t raw_buffer[MAX_LOAD_SIZE];
 
@@ -97,7 +102,7 @@ void SteerMotor::startReadSerial()
 		return;
 	is_read_serial_=true;
 	read_serial_thread_ptr_ = 
-	    std::shared_ptr<std::thread >(new std::thread(&SteerMotor::readSerialPort, this));
+	    std::shared_ptr<std::thread >(new std::thread(&SteerMotor::readSerialThread, this));
 }
 
 void SteerMotor::stopReadSerial()
@@ -105,7 +110,7 @@ void SteerMotor::stopReadSerial()
 	is_read_serial_ = false;
 }
 
-void SteerMotor::readSerialPort()
+void SteerMotor::readSerialThread()
 {
 	serial_port_->flush(); //clear the old data from receive buffer
 	while ( is_read_serial_) 
