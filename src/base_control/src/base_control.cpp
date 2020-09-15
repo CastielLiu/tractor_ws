@@ -93,10 +93,14 @@ bool BaseControl::rebootMotor(std_srvs::Empty::Request& , std_srvs::Empty::Respo
 
 void BaseControl::publishState_callback(const ros::TimerEvent&)
 {
+	//转向电机状态反馈
   	state_.roadWheelAngle = steerMotor_.getRoadWheelAngle();
     state_.motorSpeed = steerMotor_.getMotorSpeed();
     state_.steerMotorEnabled = steerMotor_.is_enabled();
     state_.steerMotorError = steerMotor_.getErrorMsg();
+
+	//制动系统状态反馈
+
     pub_state_.publish(state_);
 }
 

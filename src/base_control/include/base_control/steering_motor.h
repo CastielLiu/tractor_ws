@@ -89,6 +89,18 @@ class SteerMotor
 	bool is_enabled_;
 	float motor_speed_;
 	uint8_t error_code_;
+
+	enum ErrorCode
+	{
+		Error_None = 0,
+		Error_OverCurrent = 1,
+		Error_OverVoltage = 2,
+		Error_UnderVoltage= 3,
+		Error_OverLoad    = 0x0E,
+		Error_LockedRotor = 0x11,
+		Error_OverSpeed   = 0x14,
+		Error_PowerBan    = 0x1A,
+	};
 	
 	//串口有消息反馈则为在线，长时间没有收到消息则为离线
 	bool motor_offline_;

@@ -370,11 +370,13 @@ float SteerMotor::getRoadWheelAngle() const
 
 float SteerMotor::getMotorSpeed() const
 {
+	assert(is_request_state_);
 	return motor_speed_;
 }
 
 uint8_t SteerMotor::getErrorMsg() const 
 {
+	assert(is_request_state_);
 	return error_code_;
 }
 
