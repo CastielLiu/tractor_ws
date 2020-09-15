@@ -14,7 +14,7 @@ find_package(catkin REQUIRED COMPONENTS
 
 add_message_files(
     FILES
-    State.msg
+    BaseControlState.msg
     ControlCmd.msg
     PathTrackingInfo.msg
 )

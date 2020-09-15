@@ -39,9 +39,8 @@ bool Interface::init()
 	sub_pathtracking_info_ = 
 		nh.subscribe("/path_tracking_info",1,&Interface::path_tracking_info_callback, this);
 
-	sub_steerMoter_state_ = nh.subscribe("/steer_motor_state", 1, &Interface::steerMotorState_callback, this);
+	sub_steerMoter_state_ = nh.subscribe("/base_control_state", 1, &Interface::baseControlState_callback, this);
 	sub_system_state_ = nh.subscribe("/drive_sytem_state", 1, &Interface::driveSystemState_callback, this);
-	sub_brake_state_ = nh.subscribe("/brake_state", 1, &Interface::brakeSystemState_callback, this);
 		
 	msg_report_timer_ = nh.createTimer(ros::Duration(0.5), &Interface::msgReport_callback,this);
 	heartbeat_timer_ = nh.createTimer(ros::Duration(0.5), &Interface::heartbeat_callback, this);
@@ -206,17 +205,14 @@ void Interface::path_tracking_info_callback(const driverless_msgs::PathTrackingI
 	info_.gpsMsg.data[5] = lateral_err/2;
 }
 
-void Interface::steerMotorState_callback(const std_msgs::UInt8::ConstPtr& msg)
+//底层控制状态反馈
+void Interface::baseControlState_callback(const driverless_msgs::BaseControlState::ConstPtr& msg)
 {
-
+	
 }
 
+//驾驶系统状态反馈
 void Interface::driveSystemState_callback(const std_msgs::UInt8::ConstPtr& msg)
-{
-
-}
-
-void Interface::brakeSystemState_callback(const std_msgs::UInt8::ConstPtr& msg)
 {
 
 }

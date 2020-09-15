@@ -9,6 +9,7 @@
 #include <iostream>
 #include <unistd.h>
 #include <cmath>
+#include <assert.h>
 
 
 class SteerMotor
@@ -17,30 +18,35 @@ class SteerMotor
 	SteerMotor();
 	~SteerMotor();
 	bool init(std::string serial_port,int baud_rate);
-	void stopReadSerial();
-	void startReadSerial();
-	void setSteeringSpeed(uint8_t speed);
-	void setSteeringRotate(float cycleNum);
-	void requestAdcValue(void);
-	void requestEnableStatus();
-	void requestMotorSpeed();
-	void requestErrorMsg();
+	void stop();
+	bool selfCheck();
+	void startRequestState(int duration);
+	void stopRequestState();
 	void disable();
 	void enable();
 	bool is_enabled(){return is_enabled_;}
 	void setRoadWheelAngle(float angle);
-	const float getRoadWheelAngle(){return road_wheel_angle_;}
-	const float getMotorSpeed() {return motor_speed_;}
-	const uint8_t getErrorMsg() {return error_code_;}
+	float getRoadWheelAngle() const;
+	float getMotorSpeed() const;
+	uint8_t getErrorMsg() const;
 	void clearErrorFlag();
 	void reboot();
 	
 	void setRoadWheelAngleResolution(float val){road_wheel_angle_resolution_ = val;}
 	void setRoadWheelAngleOffset(float offset){road_wheel_angle_offset_ = offset;}
   private:
+  	void stopReadSerial();
+	void startReadSerial();
 	bool configure_port(std::string port,int baud_rate);
 	void readSerialThread();
-	void requestMsgThread();
+	void requestStateThread(int duration);
+	void requestAdcValue(void);
+	void requestEnableStatus();
+	void requestMotorSpeed();
+	void requestErrorMsg();
+	void setSteeringSpeed(uint8_t speed);
+	void setSteeringRotate(float cycleNum);
+
 	uint16_t generateModBusCRC_byTable(const uint8_t *ptr,uint8_t size);
 	void BufferIncomingData(uint8_t *message, int length);
 	void sendCmd(const uint8_t* buf,int len);
@@ -49,7 +55,9 @@ class SteerMotor
 	serial::Serial *serial_port_;
 	bool is_read_serial_;
 	std::shared_ptr<std::thread> read_serial_thread_ptr_;
-	std::shared_ptr<std::thread> request_msg_thread_ptr_;
+
+	bool is_request_state_;
+	std::shared_ptr<std::thread> request_state_thread_ptr_;
 	
 	//+线程同步相关变量
 	std::condition_variable condition_variable_;
@@ -71,6 +79,8 @@ class SteerMotor
 	};
 	int response_data_type_;
 	//-线程同步相关变量
+
+	std::mutex send_cmd_mutex_; //指令发送互斥锁
 	
 	float road_wheel_angle_;
 	
@@ -79,6 +89,9 @@ class SteerMotor
 	bool is_enabled_;
 	float motor_speed_;
 	uint8_t error_code_;
+	
+	//串口有消息反馈则为在线，长时间没有收到消息则为离线
+	bool motor_offline_;
 };
 
 #endif

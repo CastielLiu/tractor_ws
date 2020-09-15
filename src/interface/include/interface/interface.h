@@ -8,6 +8,7 @@
 #include <boost/thread.hpp>
 #include <boost/bind.hpp>
 #include <driverless_msgs/PathTrackingInfo.h>
+#include <driverless_msgs/BaseControlState.h>
 #include <interface/RecordPath.h>
 #include <interface/Driverless.h>
 #include <interface/DriverlessStatus.h>
@@ -31,9 +32,8 @@ class Interface
 	void heartbeat_callback(const ros::TimerEvent& event);
 
 	void path_tracking_info_callback(const driverless_msgs::PathTrackingInfo::ConstPtr& );
-	void steerMotorState_callback(const std_msgs::UInt8::ConstPtr& msg);
+	void baseControlState_callback(const driverless_msgs::BaseControlState::ConstPtr& msg);
 	void driveSystemState_callback(const std_msgs::UInt8::ConstPtr& msg);
-	void brakeSystemState_callback(const std_msgs::UInt8::ConstPtr& msg);
 	bool driverlessStatusService(interface::DriverlessStatus::Request &req, interface::DriverlessStatus::Response &res);
 	
   private:

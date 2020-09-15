@@ -34,11 +34,13 @@ SteerMotor::SteerMotor()
 {
 	serial_port_ = NULL;
 	is_read_serial_ = false;
+	is_request_state_ = false;
 	road_wheel_angle_ = 0.0;
 	road_wheel_angle_resolution_ = 180.0/4096;
 	road_wheel_angle_offset_ = 0.0; //前轮转角偏移值
 	is_enabled_ = false;
 	error_code_ = 0x00;
+	motor_offline_ = true; //初始时默认离线，
 }
 
 SteerMotor::~SteerMotor()
@@ -57,8 +59,15 @@ bool SteerMotor::init(std::string serial_port,int baud_rate)
 	if(!configure_port(serial_port, baud_rate))
 		return false;
 	this->startReadSerial();
-	
-	return true;
+	this->startRequestState(50);
+
+	return this->selfCheck();
+}
+
+void SteerMotor::stop()
+{
+	this->stopReadSerial();
+	this->stopRequestState();
 }
 
 bool SteerMotor::configure_port(std::string port,int baud_rate)
@@ -253,7 +262,9 @@ void SteerMotor::BufferIncomingData(uint8_t *message, int length)
 
 void SteerMotor::sendCmd(const uint8_t* buf,int len)
 {
+	send_cmd_mutex_.lock();
 	serial_port_->write(buf,len);
+	send_cmd_mutex_.unlock();
 #if USE_THREAD_SYNCHRONIZE
 	condition_variable_.notify_one();
 #endif
@@ -279,6 +290,92 @@ void SteerMotor::setSteeringSpeed(uint8_t speed)
     response_data_type_ = DataResponse_SetSpeed;
 #endif
 	sendCmd(steeringSpeedCmd,8);
+}
+
+//启动电机数据请求线程
+void SteerMotor::startRequestState(int duration)
+{
+	if(is_request_state_) return ;
+
+	is_request_state_ = true;
+
+	request_state_thread_ptr_ = 
+	    std::shared_ptr<std::thread >(new std::thread(&SteerMotor::requestStateThread, this, duration));
+}
+
+//电机数据定时获请求线程
+void SteerMotor::requestStateThread(int duration)
+{
+	int cmd_inteval = 5; //指令间隔 ms
+	int i = 0;
+	while(is_request_state_)
+	{
+		++i; 
+        this->requestMotorSpeed();
+        std::this_thread::sleep_for(std::chrono::microseconds(cmd_inteval)); 
+
+		if(i%5 == 0)
+		{
+			this->requestEnableStatus();
+        	std::this_thread::sleep_for(std::chrono::microseconds(cmd_inteval));
+		}
+		if(i%10 == 0)
+   		{
+			this->requestErrorMsg();
+			std::this_thread::sleep_for(std::chrono::microseconds(cmd_inteval));
+    	}
+		std::this_thread::sleep_for(std::chrono::microseconds(duration));
+	}
+}
+
+//电机自检，首先查看错误码，然后尝试使能电机
+bool SteerMotor::selfCheck()
+{
+	assert(is_read_serial_);
+	assert(is_request_state_);
+	int max_try_times = 10;
+	std::cout << "SteerMotor is self checking..." << std::endl ;
+	while(max_try_times--)
+	{
+		if(this->error_code_ != 0)
+		{
+			std::cerr << "SteerMotor is in error state! error_code: " << error_code_ << std::endl;
+			break;
+		}
+			 
+		this->enable(); //尝试使能
+		std::this_thread::sleep_for(std::chrono::microseconds(100)); //等待
+
+		if(this->is_enabled_)
+		{
+			this->disable(); //使能成功，关闭使能
+			std::cout << "SteerMotor self check complete." << std::endl;
+			return true;
+		}
+	}
+	std::cerr << "steerMotor self check failed!" << std::endl;
+	return false;
+}
+
+void SteerMotor::stopRequestState()
+{
+	is_request_state_ = false;
+}
+
+float SteerMotor::getRoadWheelAngle() const
+{
+	assert(is_request_state_);
+	return road_wheel_angle_;
+}
+
+float SteerMotor::getMotorSpeed() const
+{
+	return motor_speed_;
+}
+
+uint8_t SteerMotor::getErrorMsg() const 
+{
+	return error_code_;
 }
 
 
@@ -489,7 +586,7 @@ void SteerMotor::setRoadWheelAngle(float angle)
 //              << "\tspeed: " << int(rotate_speed) << std::endl;
 }
 
-//the default speed is 20
+//默认旋转速度为20, 可利用PID控制器进行调节
 void SteerMotor::rotate(float angle, uint8_t speed)
 {
     //degreePerCycle 前轮转动一度对应的电机脉冲数，需要标定
@@ -505,5 +602,7 @@ void SteerMotor::rotate(float angle, uint8_t speed)
 	
 	setSteeringRotate(cycleNum);
 }
+
+
 
 

@@ -1,6 +1,6 @@
 #include"base_control/steering_motor.h"
 #include<driverless_msgs/ControlCmd.h>
-#include<driverless_msgs/State.h>
+#include<driverless_msgs/BaseControlState.h>
 #include<ros/ros.h>
 #include<serial/serial.h>
 #include<iostream>
@@ -22,11 +22,10 @@ class BaseControl
 	bool init();
 	void run();
   private:
-    void requestMotorStatus();
     bool rebootMotor(std_srvs::Empty::Request& , std_srvs::Empty::Response&);
     bool clearMotorErrors(std_srvs::Empty::Request& , std_srvs::Empty::Response&);
 	void cmd_callback(const driverless_msgs::ControlCmd::ConstPtr& cmd);
-	void requestMotorStatus_callback(const ros::TimerEvent&);
+	void publishState_callback(const ros::TimerEvent&);
 	SteerMotor steerMotor_;
 	std::string steerMotor_port_name_;
 	
@@ -34,9 +33,9 @@ class BaseControl
 	ros::Publisher pub_state_;
 	ros::ServiceServer clear_motor_error_service_;
 	
-	driverless_msgs::State state_;
+	driverless_msgs::BaseControlState state_;
 	driverless_msgs::ControlCmd cmd_;
-	ros::Timer getSystemData_timer_;
+	ros::Timer publishState_timer_;
 };
 
 BaseControl::BaseControl()
@@ -46,7 +45,7 @@ BaseControl::BaseControl()
 
 BaseControl::~BaseControl()
 {
-	steerMotor_.stopReadSerial();
+	steerMotor_.stop();
 }
 
 
@@ -64,41 +63,19 @@ bool BaseControl::init()
 	
 	if(!steerMotor_.init(steerMotor_port_name_,115200))
 	{
-	    ROS_ERROR("[%s] init steering motor serial port failed.", __NAME__);
+	    ROS_ERROR("[%s] init steering motor failed.", __NAME__);
 		return false;
 	}
-	steerMotor_.startReadSerial();
 	
-	getSystemData_timer_ = 
-	    nh.createTimer(ros::Duration(0.1), &BaseControl::requestMotorStatus_callback, this);
-	
-	ROS_INFO("[%s] waiting for steering motor enable...",__NAME__);
-	
-	while(ros::ok() && !steerMotor_.is_enabled())
-	{
-	    steerMotor_.enable();             //电机使能
-	    ros::Duration(0.2).sleep();
-	    steerMotor_.requestEnableStatus();//请求获取使能状态
-	    ros::Duration(0.5).sleep();
-	    ROS_INFO("[%s] waiting for steering motor enable...",__NAME__);
-	}
-	
-	ROS_INFO("[%s] steering motor enabled.",__NAME__);
+	publishState_timer_ = 
+	    nh.createTimer(ros::Duration(0.1), &BaseControl::publishState_callback, this);
 	
 	std::string cmd_topic = nh_private.param<std::string>("cmd_topic","/cmd");
 	sub_cmd_ = nh.subscribe(cmd_topic, 1, &BaseControl::cmd_callback, this);
 	
-	pub_state_ = nh.advertise<driverless_msgs::State>("/state",1);
+	pub_state_ = nh.advertise<driverless_msgs::BaseControlState>("/base_control_state",1);
 	clear_motor_error_service_ = nh.advertiseService("/clear_motor_error_flag", &BaseControl::clearMotorErrors, this);
 	
-	ros::Rate loop_rate(30);
-	while(ros::ok())
-	{
-	    ros::spinOnce();
-	    loop_rate.sleep();
-	}
-	
-	steerMotor_.stopReadSerial();
     return true;
 }
 
@@ -114,42 +91,13 @@ bool BaseControl::rebootMotor(std_srvs::Empty::Request& , std_srvs::Empty::Respo
     return true;
 }
 
-void BaseControl::requestMotorStatus()
+void BaseControl::publishState_callback(const ros::TimerEvent&)
 {
-    static int i = 0;
-    static float cmd_inteval = 0.01;
-    
-    if(i%2 == 0)
-    {
-        steerMotor_.requestMotorSpeed();
-        ros::Duration(cmd_inteval).sleep(); 
-    }
-    if(i%5 == 0)
-    {
-        steerMotor_.requestEnableStatus();
-        ros::Duration(cmd_inteval).sleep();
-    }
-    if(i%50 == 0)
-    {
-        steerMotor_.requestErrorMsg();
-        ros::Duration(cmd_inteval).sleep();
-    }
-    ++i;
-    
-    steerMotor_.requestAdcValue();
-    
-    state_.roadWheelAngle = steerMotor_.getRoadWheelAngle();
+  	state_.roadWheelAngle = steerMotor_.getRoadWheelAngle();
     state_.motorSpeed = steerMotor_.getMotorSpeed();
     state_.steerMotorEnabled = steerMotor_.is_enabled();
     state_.steerMotorError = steerMotor_.getErrorMsg();
     pub_state_.publish(state_);
-    
-    ros::Duration(cmd_inteval).sleep();
-}
-
-void BaseControl::requestMotorStatus_callback(const ros::TimerEvent&)
-{
-    this->requestMotorStatus();
 }
 
 void BaseControl::cmd_callback(const driverless_msgs::ControlCmd::ConstPtr& msg)
@@ -178,5 +126,6 @@ int main(int argc, char** argv)
 	ros::init(argc,argv,"base_control_node");
 	BaseControl base_control;
 	base_control.init();
+	ros::spin();
 	return 0;
 }
