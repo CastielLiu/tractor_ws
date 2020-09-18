@@ -39,10 +39,10 @@ typedef struct systemResetMsg
 
 typedef struct heartbeatStruct
 {
-    uint8_t gpsState         :4;
-    uint8_t steerMotorState  :4;
-    uint8_t brakeSystemState :4;
+    uint8_t gpsState         :2;
+    uint8_t brakeSystemState :2;
     uint8_t driveSystemState :4;
+    uint8_t steerMotorState;
 } heartbeatStruct_t;
 
 #endif

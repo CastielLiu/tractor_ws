@@ -18,6 +18,13 @@ typedef struct
 	float maxOffset_right;
 }gpsMsg_t;
 
+void printPathPoints(const std::vector<gpsMsg_t>& points)
+{
+	for(size_t i=0; i< points.size();i++ )
+	{
+	  std::cout <<points[i].x << "\t" << points[i].y <<std::endl;
+	}
+}
 
 float calculateDis2path(const double& X_,const double& Y_,
 						 const std::vector<gpsMsg_t>& path_points, 

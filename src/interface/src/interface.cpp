@@ -37,10 +37,10 @@ bool Interface::init()
 	sub_gps_ = nh.subscribe(utm_topic, 1,&Interface::odom_callback,this);
 
 	sub_pathtracking_info_ = 
-		nh.subscribe("/path_tracking_info",1,&Interface::path_tracking_info_callback, this);
+		nh.subscribe("tracking_info",1,&Interface::path_tracking_info_callback, this);
 
 	sub_steerMoter_state_ = nh.subscribe("/base_control_state", 1, &Interface::baseControlState_callback, this);
-	sub_system_state_ = nh.subscribe("/drive_sytem_state", 1, &Interface::driveSystemState_callback, this);
+	sub_system_state_ = nh.subscribe("/system_state", 1, &Interface::driveSystemState_callback, this);
 		
 	msg_report_timer_ = nh.createTimer(ros::Duration(0.5), &Interface::msgReport_callback,this);
 	heartbeat_timer_ = nh.createTimer(ros::Duration(0.5), &Interface::heartbeat_callback, this);
@@ -51,9 +51,6 @@ bool Interface::init()
 	client_driverless_ = nh.serviceClient<interface::Driverless>("driverless_service");
 	//创建清除转向电机错误代码客户端
 	client_clearMotorError_ = nh.serviceClient<std_srvs::Empty>("clear_motor_error_flag");
-	
-	//创建自动驾驶状态服务端
-	server_driverless_status_ = nh.advertiseService("driverlessStatus_service",&Interface::driverlessStatusService, this);
 	
 	nh_private.param<std::string>("can2serial_port",can2serial_port_,"");
 	nh_private.param<int>("can_baudrate",can_baudrate_,250);
@@ -208,21 +205,16 @@ void Interface::path_tracking_info_callback(const driverless_msgs::PathTrackingI
 //底层控制状态反馈
 void Interface::baseControlState_callback(const driverless_msgs::BaseControlState::ConstPtr& msg)
 {
-	
+	heart_beat_pkg_.brakeSystemState = msg->brakeError;     //制动系统状态
+	heart_beat_pkg_.steerMotorState = msg->steerMotorError; //转向系统状态
 }
 
 //驾驶系统状态反馈
 void Interface::driveSystemState_callback(const std_msgs::UInt8::ConstPtr& msg)
 {
-
+	heart_beat_pkg_.driveSystemState = msg->data;
 }
 
-bool Interface::driverlessStatusService(interface::DriverlessStatus::Request  &req,
-							 			interface::DriverlessStatus::Response &res)
-{
-	ROS_INFO("[%s] auto drive complete. ",__NAME__);
-	return true;
-}
 
 //状态数据定时上报
 void Interface::msgReport_callback(const ros::TimerEvent& event)
@@ -247,13 +239,8 @@ void Interface::msgReport_callback(const ros::TimerEvent& event)
 //发送心跳包
 void Interface::heartbeat_callback(const ros::TimerEvent& event)
 {
-	heartbeatStruct_t *heartbeat = (heartbeatStruct_t *)info_.heartbeat.data;
-	/*
-	heartbeat->gpsState = 
-    heartbeat->steerMotorState  = 
-    heartbeat->brakeSystemState = 
-    heartbeat->driveSystemState = 
-	*/
+	memcpy(info_.heartbeat.data, &heart_beat_pkg_, sizeof(heart_beat_pkg_));
+	
 	can2serial_->sendCanMsg(info_.heartbeat);
 
 }

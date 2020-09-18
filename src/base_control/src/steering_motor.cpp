@@ -41,6 +41,7 @@ SteerMotor::SteerMotor()
 	is_enabled_ = false;
 	error_code_ = 0x00;
 	motor_offline_ = true; //初始时默认离线，
+	last_active_time_ms_ = 0;
 }
 
 SteerMotor::~SteerMotor()
@@ -219,9 +220,10 @@ void SteerMotor::BufferIncomingData(uint8_t *message, int length)
 			//判断校验位
 			if((check_num&0xff)==pkg_buffer[bufferIndex-1] && (check_num>>8)==pkg_buffer[bufferIndex])
 			{
+				last_active_time_ms_ = 
+					std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::system_clock::now().time_since_epoch()).count();
             #if USE_THREAD_SYNCHRONIZE
                 uint16_t rawVal = pkg_buffer[3]*256 + pkg_buffer[4];
-                
                 
                 if(response_data_type_ == DataResponse_AdcValue)
 					road_wheel_angle_ = 1.0 * rawVal * road_wheel_angle_resolution_ + road_wheel_angle_offset_;
@@ -377,9 +379,13 @@ float SteerMotor::getMotorSpeed() const
 uint8_t SteerMotor::getErrorMsg() const 
 {
 	assert(is_request_state_);
+	uint64_t now = std::chrono::duration_cast<std::chrono::milliseconds>
+		(std::chrono::system_clock::now().time_since_epoch()).count();
+	if(now - last_active_time_ms_ > 200)
+		return 0xff; //离线
+
 	return error_code_;
 }
-
 
 void SteerMotor::enable()
 {

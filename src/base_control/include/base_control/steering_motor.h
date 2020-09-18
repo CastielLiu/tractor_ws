@@ -9,11 +9,12 @@
 #include <iostream>
 #include <unistd.h>
 #include <cmath>
+#include <chrono>
 #include <assert.h>
-
 
 class SteerMotor
 {
+	
   public:
 	SteerMotor();
 	~SteerMotor();
@@ -89,6 +90,7 @@ class SteerMotor
 	bool is_enabled_;
 	float motor_speed_;
 	uint8_t error_code_;
+	uint64_t last_active_time_ms_; //上次活跃(收到串口正确应答)时间
 
 	enum ErrorCode
 	{

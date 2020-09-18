@@ -74,15 +74,12 @@ bool BaseControl::init()
 		return false;
 	}
 	
-	publishState_timer_ = 
-	    nh.createTimer(ros::Duration(0.1), &BaseControl::publishState_callback, this);
-	
-	std::string cmd_topic = nh_private.param<std::string>("cmd_topic","/cmd");
-	sub_cmd_ = nh.subscribe(cmd_topic, 1, &BaseControl::cmd_callback, this);
+	sub_cmd_ = nh.subscribe("/cmd", 1, &BaseControl::cmd_callback, this);
 	sub_brakeSystem_ = nh.subscribe("/brake_state", 1, &BaseControl::brakeSystem_callback, this);
 	pub_brakeCmd_ = nh.advertise<std_msgs::UInt8>("/brake_cmd", 1);
 
-	
+	publishState_timer_ = 
+	    nh.createTimer(ros::Duration(0.1), &BaseControl::publishState_callback, this);
 	pub_state_ = nh.advertise<driverless_msgs::BaseControlState>("/base_control_state",1);
 	clear_motor_error_service_ = nh.advertiseService("/clear_motor_error_flag", &BaseControl::clearMotorErrors, this);
 	

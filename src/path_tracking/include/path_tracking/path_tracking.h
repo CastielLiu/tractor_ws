@@ -28,31 +28,25 @@ public:
 	bool init(ros::NodeHandle nh,ros::NodeHandle nh_private);
 	void run();
 	
-	void timer_callback(const ros::TimerEvent&);
-	
-	void odom_callback(const nav_msgs::Odometry::ConstPtr& msg);
-	
-	void avoiding_flag_callback(const std_msgs::Float32::ConstPtr& msg);
-
-	void spinThread(){ros::spin();}
-
 private:
 	void publishInfo();
 	bool driverlessService(interface::Driverless::Request  &req,
 									 interface::Driverless::Response &res);
-	bool callOtherService(const std::string& data);
 	void pathTrackingThread(const fs::path& file, float speed);
+	bool extendGlobalPath(float extendDis);
+	void timer_callback(const ros::TimerEvent&);
+	void odom_callback(const nav_msgs::Odometry::ConstPtr& msg);
+	void avoiding_flag_callback(const std_msgs::Float32::ConstPtr& msg);
+	void spinThread(){ros::spin();}
 private:
-	
 	ros::Subscriber sub_utm_;
-	
 	ros::Subscriber sub_path_offset_;
 	
 	ros::Timer timer_;
 	
 	ros::Publisher pub_cmd_;
-	
 	ros::Publisher pub_info_;
+	ros::Publisher pub_state_;
 	
 	ros::ServiceServer srv_driverless_;
 	ros::ServiceClient other_client_nh_;

@@ -34,7 +34,6 @@ class Interface
 	void path_tracking_info_callback(const driverless_msgs::PathTrackingInfo::ConstPtr& );
 	void baseControlState_callback(const driverless_msgs::BaseControlState::ConstPtr& msg);
 	void driveSystemState_callback(const std_msgs::UInt8::ConstPtr& msg);
-	bool driverlessStatusService(interface::DriverlessStatus::Request &req, interface::DriverlessStatus::Response &res);
 	
   private:
 	Can2serial * can2serial_;
@@ -42,6 +41,7 @@ class Interface
 	int can_baudrate_;
 
 	canMsgs_t info_;
+	heartbeatStruct_t heart_beat_pkg_;
 	
 	bool gps_odom_flag_, tracking_info_flag_;
 	
@@ -50,7 +50,6 @@ class Interface
 	ros::Subscriber sub_steerMoter_state_;
 	ros::Subscriber sub_system_state_;
 	ros::Subscriber sub_brake_state_;
-
 
 	ros::Timer msg_report_timer_;
 	ros::Timer heartbeat_timer_;
@@ -64,8 +63,7 @@ class Interface
 	interface::Driverless srv_driverless_;
 	
 	ros::ServiceServer server_driverless_status_;
-	ros::ServiceClient client_clearMotorError_;
-	//清除转向电机错误代码
+	ros::ServiceClient client_clearMotorError_;//清除转向电机错误代码
 	
 
 	
