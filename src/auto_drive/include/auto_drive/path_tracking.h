@@ -27,7 +27,7 @@ public:
 	~PathTracking();
 	bool init(const gpsMsg_t& vehicle_point );
 	bool isRunning() {return is_running_;}
-	void setPath(const path_t& path);
+	bool setPath(const path_t& path);
 	bool extendGlobalPath(float extendDis);
 	
 	bool update(float speed, float road_wheelangle,  //vehicle state

@@ -136,14 +136,15 @@ bool PathTracking::update(float speed, float road_wheelangle,  //vehicle state
 	return true;
 }
 
-void PathTracking::setPath(const path_t& path)
+bool PathTracking::setPath(const path_t& path)
 {
 	path_mutex_.lock();
     path_ = path;
 	//终点索引为拓展前路径的最后一个点
 	destination_index_ = path_.size()-1;
-	extendGlobalPath(20.0);
+	bool ok = extendGlobalPath(20.0);
 	path_mutex_.unlock();
+	return ok;
 }
 
 void PathTracking::getTrackingCmd(float& speed, float& roadWheelAngle)

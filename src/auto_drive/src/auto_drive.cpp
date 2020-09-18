@@ -6,25 +6,21 @@
  */
 
 /* current state   */
-#define TrackerIdle    0
+#define SystemIdle    0      
 #define TrackerSuspend 1
-#define TrackerStop    2
 #define VertexTracking 3
 #define CurveTracking  4
 #define TrackerComplete 5
+#define RecordCurvePath 6
+#define RecordVertexPath 7
 
-/*auto_drive response*/
-#define Success         interface::Driverless::Response::SUCCESS
-#define FileNotExist    interface::Driverless::Response::PATH_FILE_NOT_EXIST
-#define Fail            interface::Driverless::Response::FAIL
-#define FileError       interface::Driverless::Response::PATH_FILE_ERROR
 
 #define __NAME__ "auto_drive"
 #define USE_AVOIDANCE 0
 
 AutoDrive::AutoDrive():
     nh_private_("~"),
-    status_(TrackerIdle),
+    status_(SystemIdle),
     avoid_offset_(0.0),
     tracker_(nh_, nh_private_),
     avoider_(nh_, nh_private_)
@@ -60,6 +56,8 @@ bool AutoDrive::init()
 	}
     std::string cmd_topic = nh_private_.param<std::string>("cmd_topic","/cmd");
     pub_cmd_ = nh_.advertise<driverless_msgs::ControlCmd>(cmd_topic, 1);
+	pub_state_ = nh_.advertise<std_msgs::UInt8>("/system_state", 1); //发布系统状态
+
 	update_timer_ = nh_.createTimer(ros::Duration(0.05),&AutoDrive::update_timer_callback,this);
 
     srv_driverless_ = nh_.advertiseService("driverless_service",&AutoDrive::driverlessService,this);
@@ -80,16 +78,17 @@ bool AutoDrive::driverlessService(interface::Driverless::Request  &req,
 {
 	if(req.command_type == req.START)
 	{
+		//应判断新请求与当前状态是否一致，甚至文件名是否一致！
 		if(this->status_ == VertexTracking || this->status_ == CurveTracking)
 		{
-			res.success = Success;
+			res.success = res.SUCCESS;
 			return true;
 		}
 		fs::path file = fs::path(path_file_dir_)/req.path_file_name;
 		if(!fs::exists(file))
 		{
 		    ROS_ERROR("[%s] %s FileNotExist.",__NAME__,fs::system_complete(file).string().c_str());
-			res.success = FileNotExist;
+			res.success = res.PATH_FILE_NOT_EXIST;
 			return true;
 		}
 		std::string file_name = fs::system_complete(file).string();
@@ -97,10 +96,12 @@ bool AutoDrive::driverlessService(interface::Driverless::Request  &req,
 		{
 			this->status_ = CurveTracking;
 			path_.clear();
-			bool ok = loadPath(file_name, path_);
-			if(!ok)
+			
+			//载入路径文件，并配置路径跟踪控制器
+			if(!loadPath(file_name, path_) || !this->tracker_.setPath(path_))
 			{
-				res.success = FileError;
+				res.success = res.PATH_FILE_ERROR;
+				this->status_ = SystemIdle;
 				return true;
 			}
 			ROS_INFO("[%s] Curve tracking path points size: %lu",__NAME__, path_.points.size());
@@ -109,37 +110,58 @@ bool AutoDrive::driverlessService(interface::Driverless::Request  &req,
 		{
 			this->status_ = VertexTracking;
 			path_t vertex_path;
-			bool ok = loadPath(file_name,vertex_path);
-			if(!ok)
+			if(!loadPath(file_name,vertex_path) || !generatePathByVertexes(vertex_path, path_, 0.1))
 			{
-				res.success = FileError;
+				res.success = res.PATH_FILE_ERROR;
+				this->status_ = SystemIdle;
 				return true;
 			}
-			generatePathByVertexes(vertex_path, path_, 0.1);
 			ROS_INFO("[%s] Vertex tracking path points size:%lu",__NAME__, path_.points.size());
 		}
 		else
 		{
-			res.success = Fail;
+			res.success = res.FAIL;
+			this->status_ = SystemIdle;
 			return true;
+		}
+
+		if(req.path_type == req.VERTEX_TYPE || req.path_type == req.CURVE_TYPE)
+		{
+			if(!tracker_.init(vehicle_point_))
+			{
+				res.success = res.FAIL;
+				this->status_ = SystemIdle;
+				return true;
+			}
+
+			#if USE_AVOIDANCE
+			//配置避障控制器
+			avoider_.setPath(path_);
+			if(!avoider_.init()) 
+			{
+				res.success = res.FAIL;
+				this->status_ = SystemIdle;
+				return true;
+			}
+			#endif
 		}
 		
 		auto_drive_thread_ptr_ = 
             boost::shared_ptr<boost::thread >(new boost::thread(boost::bind(&AutoDrive::autoDriveThread, this,req.speed)));
 	}
 	else if(req.command_type == req.STOP)
-		this->status_ = TrackerStop;
+		this->status_ = TrackerComplete;
 	else if(req.command_type == req.SUSPEND)
 		this->status_ = TrackerSuspend;
 	else if(req.command_type == req.CONFIRM_STOP)
-		this->status_ = TrackerIdle;
+		this->status_ = SystemIdle;
 	else
 	{
-		res.success = Fail;
+		res.success = res.FAIL;
 		return true;
 	}
 	
-	res.success = Success;
+	res.success = res.SUCCESS;
 	return true;
 }
 
@@ -147,18 +169,6 @@ void AutoDrive::autoDriveThread(float speed)
 {
 	if(speed > max_speed_)
 		speed = max_speed_;
-		
-	//配置路径跟踪控制器
-	this->tracker_.setPath(path_);
-    if(!tracker_.init(vehicle_point_))
-        return;
-
-#if USE_AVOIDANCE
-	//配置避障控制器
-	avoider_.setPath(path_);
-	if(!avoider_.init()) 
-		return;
-#endif
 	
 	ros::Rate loop_rate(20);
 	
@@ -169,16 +179,16 @@ void AutoDrive::autoDriveThread(float speed)
 			loop_rate.sleep();
 			continue;
 		}
-		if((status_ == TrackerStop) || (status_ == TrackerIdle))
+		if((status_ == TrackerComplete) || (status_ == SystemIdle))
 			break;
 			
 		bool update_state = tracker_.update(vehicle_speed_, roadwheel_angle_, vehicle_point_, avoid_offset_);
         if(update_state == false)
         {
-			//此处不退出程序，持续返回完成信息，直到确认退出
 			callDriverlessStatusService(interface::DriverlessStatus::Request::NORMAL_EXIT);
 			if((status_ == VertexTracking) || (status_ == CurveTracking))
 			{
+				//此处状态为跟踪完成，待上位机确认后置为空闲
 				status_ = TrackerComplete;
 				ROS_INFO("[%s] reach the destination.", __NAME__);
 			}
@@ -186,7 +196,7 @@ void AutoDrive::autoDriveThread(float speed)
 		else
         	tracker_.getTrackingCmd(cmd_.set_speed, cmd_.set_roadWheelAngle);
 		loop_rate.sleep();
-	}
+	} //自动驾驶完成
 	
 	ROS_INFO("[%s] automatic drive completed...",__NAME__); //send msg to screen ??????/
 
@@ -197,32 +207,20 @@ void AutoDrive::autoDriveThread(float speed)
 
 void AutoDrive::update_timer_callback(const ros::TimerEvent&)
 {
-	if(this->status_ == TrackerIdle)
+	if(this->status_ == SystemIdle)
 	{
 		cmd_.driverless_mode = false;
+		cmd_.set_brake = 0;
 	}
 	else if(this->status_ == TrackerSuspend)
 	{
 		cmd_.driverless_mode = true;
-		cmd_.set_brake = 1;
+		cmd_.set_brake = 5;
 	}
-	else if(this->status_ == TrackerStop)
+	else if(this->status_ == TrackerComplete)
 	{
-		//停止跟踪一段时间后，将状态置为TrackerIdle
-		static bool is_first = false;
-		static ros::Time first_time;
-		if(!is_first)
-		{
-			is_first = true;
-			first_time = ros::Time::now();
-		}
-		else if((ros::Time::now() - first_time).toSec() > 10.0)
-		{
-			this->status_ = TrackerIdle;
-			is_first = false;
-		}
 		cmd_.driverless_mode = true;
-		cmd_.set_brake = 1;
+		cmd_.set_brake = 5;
 	}
 	else
 	{
@@ -230,6 +228,11 @@ void AutoDrive::update_timer_callback(const ros::TimerEvent&)
 		cmd_.set_brake = 0;
 	}
 	pub_cmd_.publish(cmd_);
+
+	std_msgs::UInt8 state;
+	state.data = this->status_;
+	pub_state_.publish(state);
+
 }
 
 void AutoDrive::odom_callback(const nav_msgs::Odometry::ConstPtr& msg)

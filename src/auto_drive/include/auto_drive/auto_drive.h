@@ -7,6 +7,7 @@
 #include <interface/DriverlessStatus.h>
 #include <interface/Driverless.h>
 #include <std_srvs/Empty.h>
+#include <std_msgs/UInt8.h>
 
 #include <driverless_msgs/State.h>
 //#include <>
@@ -40,6 +41,7 @@ class AutoDrive
 
 	ros::Timer timer_;
 	ros::Publisher pub_cmd_;
+    ros::Publisher pub_state_;
     ros::Subscriber sub_utm_;
     ros::Subscriber sub_state_;
     ros::Timer update_timer_;
