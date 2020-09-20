@@ -8,9 +8,8 @@
 #include <interface/Driverless.h>
 #include <std_srvs/Empty.h>
 #include <std_msgs/UInt8.h>
-
-#include <driverless_msgs/State.h>
-//#include <>
+#include <driverless_msgs/BaseControlState.h>
+#include "state_machine.h"
 #include"ros/ros.h"
 
 namespace fs = boost::filesystem;
@@ -24,7 +23,7 @@ class AutoDrive
     void run();
     void autoDriveThread(float speed);
     void odom_callback(const nav_msgs::Odometry::ConstPtr& msg);
-    void state_callback(const driverless_msgs::State::ConstPtr& msg);
+    void base_ctrl_state_callback(const driverless_msgs::BaseControlState::ConstPtr& msg);
     void update_timer_callback(const ros::TimerEvent&);
     bool driverlessService(interface::Driverless::Request  &req,
 									 interface::Driverless::Response &res);
@@ -47,13 +46,15 @@ class AutoDrive
     ros::Timer update_timer_;
 
     ros::ServiceServer srv_driverless_;
-	ros::ServiceClient driverless_status_client_nh_;
     ros::NodeHandle nh_, nh_private_;
 
-    boost::shared_ptr<boost::thread> auto_drive_thread_ptr_;
+    std::shared_ptr<std::thread> auto_drive_thread_ptr_;
+    std::mutex auto_drive_thread_mutex_;
+
     driverless_msgs::ControlCmd cmd_;
     
-	int status_;
+    StateMachine state_;
+
     float avoid_offset_;
 
     PathTracking tracker_;

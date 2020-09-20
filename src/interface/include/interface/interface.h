@@ -14,6 +14,7 @@
 #include <interface/DriverlessStatus.h>
 #include <std_srvs/Empty.h>
 #include <std_msgs/UInt8.h>
+#include <thread>
 #include "structs.h"
 
 
@@ -30,6 +31,7 @@ class Interface
 	void odom_callback(const nav_msgs::Odometry::ConstPtr& gps);
 	void msgReport_callback(const ros::TimerEvent& event);
 	void heartbeat_callback(const ros::TimerEvent& event);
+	void callServiceThread(const CanMsg_t& can_msg);
 
 	void path_tracking_info_callback(const driverless_msgs::PathTrackingInfo::ConstPtr& );
 	void baseControlState_callback(const driverless_msgs::BaseControlState::ConstPtr& msg);
@@ -40,7 +42,7 @@ class Interface
 	std::string can2serial_port_;
 	int can_baudrate_;
 
-	canMsgs_t info_;
+	canMsgs_t can_pkgs_;
 	heartbeatStruct_t heart_beat_pkg_;
 	
 	bool gps_odom_flag_, tracking_info_flag_;
@@ -57,10 +59,7 @@ class Interface
 	boost::shared_ptr<boost::thread> read_canMsg_thread_;
 	
 	ros::ServiceClient client_recordPath_;
-	interface::RecordPath srv_record_path_;
-	
 	ros::ServiceClient client_driverless_;
-	interface::Driverless srv_driverless_;
 	
 	ros::ServiceServer server_driverless_status_;
 	ros::ServiceClient client_clearMotorError_;//清除转向电机错误代码

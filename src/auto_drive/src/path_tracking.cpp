@@ -20,7 +20,7 @@ PathTracking::~PathTracking()
 
 bool PathTracking::init(const gpsMsg_t& vehicle_point)
 {
-	pub_info_ = nh_.advertise<driverless_msgs::PathTrackingInfo>("/path_tracking_info",1);
+	pub_info_ = nh_.advertise<driverless_msgs::PathTrackingInfo>("/tracking_info",1);
 
 	nh_private_.param<float>("foreSightDis_speedCoefficient", foreSightDis_speedCoefficient_,1.8);
 	nh_private_.param<float>("foreSightDis_latErrCoefficient", foreSightDis_latErrCoefficient_,0.3);
