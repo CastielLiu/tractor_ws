@@ -62,18 +62,6 @@ bool BaseControl::init()
 	ros::NodeHandle nh_private("~");
 	nh_private.param<std::string>("steering_port",steerMotor_port_name_,"/dev/ttyUSB0");
 	
-	float road_wheel_angle_offset, road_wheel_angle_resolution;
-	nh_private.param<float>("road_wheel_angle_offset",road_wheel_angle_offset,0.0);
-	nh_private.param<float>("road_wheel_angle_resolution",road_wheel_angle_resolution,180.0/4096);
-	steerMotor_.setRoadWheelAngleOffset(road_wheel_angle_offset);
-	steerMotor_.setRoadWheelAngleResolution(road_wheel_angle_resolution);
-	
-	if(!steerMotor_.init(steerMotor_port_name_,115200))
-	{
-	    ROS_ERROR("[%s] init steering motor failed.", __NAME__);
-		return false;
-	}
-	
 	sub_cmd_ = nh.subscribe("/cmd", 1, &BaseControl::cmd_callback, this);
 	sub_brakeSystem_ = nh.subscribe("/brake_state", 1, &BaseControl::brakeSystem_callback, this);
 	pub_brakeCmd_ = nh.advertise<std_msgs::UInt8>("/brake_cmd", 1);
@@ -82,6 +70,17 @@ bool BaseControl::init()
 	    nh.createTimer(ros::Duration(0.1), &BaseControl::publishState_callback, this);
 	pub_state_ = nh.advertise<driverless_msgs::BaseControlState>("/base_control_state",1);
 	clear_motor_error_service_ = nh.advertiseService("/clear_motor_error_flag", &BaseControl::clearMotorErrors, this);
+
+	float road_wheel_angle_offset = nh_private.param<float>("road_wheel_angle_offset",0.0);
+ 	float road_wheel_angle_resolution = nh_private.param<float>("road_wheel_angle_resolution",180.0/4096);
+	steerMotor_.setRoadWheelAngleOffset(road_wheel_angle_offset);
+	steerMotor_.setRoadWheelAngleResolution(road_wheel_angle_resolution);
+
+	if(!steerMotor_.init(steerMotor_port_name_,115200))
+	{
+	    ROS_ERROR("[%s] init steering motor failed.", __NAME__);
+		return false;
+	}
 	
     return true;
 }

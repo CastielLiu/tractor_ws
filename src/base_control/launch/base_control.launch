@@ -1,12 +1,14 @@
 <!-- -->
 <launch>
 	<node name="base_control_node" pkg="base_control" type="base_control_node" required="true" output="screen">
-		<param name="steering_port" value="/dev/ttyUSB2"/>
+		<param name="steering_port" value="/dev/steer_motor"/>
 		<param name="road_wheel_angle_offset" value="-84"/>
+
+		<!-- road_wheel_angle_resolution: the roadWheelAngle per adc value -->
 		<param name="road_wheel_angle_resolution" value="0.04"/>
 		
 		<param name="cmd_topic" value="/tractor_cmd"/>
-		<!-- road_wheel_angle_resolution: the roadWheelAngle per adc value -->
+		
 	</node>
 
 

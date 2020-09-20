@@ -1,8 +1,8 @@
 <!-- -->
 <launch>
-    <arg name="upper_port" value="/dev/ttyUSB0"/>
-    <arg name="gps_port" value="/dev/ttyUSB1"/>
-    <arg name="steering_port" value="/dev/ttyUSB2"/>
+    <arg name="host_pc_port" value="/dev/host_pc"/>
+    <arg name="gps_port" value="/dev/gps"/>
+    <arg name="steering_port" value="/dev/steer_motor"/>
     
     <arg name="gps_topic" value="/gps_odom"/>
     <arg name="cmd_topic" value="/tractor_cmd"/>
@@ -10,7 +10,7 @@
     
 	<node name="interface_node" pkg="interface" type="interface_node" output="screen">
 	    <param name="utm_topic" value="$(arg gps_topic)"/>
-		<param name="can2serial_port" value="$(arg upper_port)"/>
+		<param name="can2serial_port" value="$(arg host_pc_port)"/>
 		<param name="can_baudrate" value="250"/>
 	</node>
 	

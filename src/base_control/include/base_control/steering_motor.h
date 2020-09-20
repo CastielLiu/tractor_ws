@@ -18,7 +18,8 @@ class SteerMotor
   public:
 	SteerMotor();
 	~SteerMotor();
-	bool init(std::string serial_port,int baud_rate);
+	bool init(const std::string& serial_port, int baud_rate);
+	bool reInit(const std::string& serial_port, int baud_rate);
 	void stop();
 	bool selfCheck();
 	void startRequestState(int duration);
@@ -82,6 +83,10 @@ class SteerMotor
 	//-线程同步相关变量
 
 	std::mutex send_cmd_mutex_; //指令发送互斥锁
+
+	//读串口和请求状态线程互斥锁，用于确认线程退出
+	std::mutex read_serial_thread_mutex_;
+	std::mutex request_state_thread_mutex_;
 	
 	float road_wheel_angle_;
 	

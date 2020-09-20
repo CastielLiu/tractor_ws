@@ -133,7 +133,7 @@ bool AutoDrive::driverlessService(interface::Driverless::Request  &req,
 		#if USE_AVOIDANCE
 		//初始化避障控制器
 		avoider_.setPath(path_);
-		if(!avoider_.init()) 
+		if(!avoider_.init())
 		{
 			res.success = res.FAIL;
 			state_.set(state_.State_SystemIdle);
@@ -162,7 +162,6 @@ bool AutoDrive::driverlessService(interface::Driverless::Request  &req,
 
 void AutoDrive::autoDriveThread(float speed)
 {
-	
 	std::lock_guard<std::mutex> lck(auto_drive_thread_mutex_);
 
 	if(speed > max_speed_)
@@ -227,7 +226,6 @@ void AutoDrive::update_timer_callback(const ros::TimerEvent&)
 	std_msgs::UInt8 state;
 	state.data = state_.get();
 	pub_state_.publish(state);
-
 }
 
 void AutoDrive::odom_callback(const nav_msgs::Odometry::ConstPtr& msg)

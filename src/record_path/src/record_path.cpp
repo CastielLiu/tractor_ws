@@ -47,6 +47,7 @@ private:
 	float sample_distance_;
 	ros::ServiceServer srv_record_path_;
 	ros::Subscriber sub_utm_ ;
+	std::string utm_topic_;
 	int status_;
 };
 
@@ -70,9 +71,9 @@ bool Recorder::init()
 	
 	private_nh.param<std::string>("file_path",file_path_,"");
 	private_nh.param<float>("sample_distance",sample_distance_,0.1);
-	std::string utm_topic = private_nh.param<std::string>("utm_topic","");
+	private_nh.param<std::string>("utm_topic", utm_topic_, "");
 	
-	if(utm_topic.empty())
+	if(utm_topic_.empty())
 	{
 		ROS_ERROR("[%s] Please input utm_topic in launch file!", __NAME__);
 		return false;
@@ -87,7 +88,7 @@ bool Recorder::init()
 	//创建服务,用于外部触发记录路径
 	srv_record_path_ = nh.advertiseService("record_path_service",&Recorder::recordPathService,this);
 	
-	sub_utm_ = nh.subscribe(utm_topic, 1, &Recorder::odom_callback,this);
+	//sub_utm_ = nh.subscribe(utm_topic_, 1, &Recorder::odom_callback,this);
 	
 	return true;
 }
@@ -105,15 +106,19 @@ float dis2Points(const gpsMsg_t& point1, const gpsMsg_t& point2,bool is_sqrt)
 bool Recorder::recordPathService(interface::RecordPath::Request  &req,
 								 interface::RecordPath::Response &res)
 {
+	/*  由调用服务者判断定位是否有效，当前节点未订阅GPS消息，无法判断
 	if(!is_location_ok())
 	{
 		ROS_ERROR("Location status is abnormal, unable to record path");
 		res.success = Fail;
 		return true;
 	}
+	*/
 	//请求开始记录
 	if(req.command_type == req.START_RECORD_PATH )
 	{
+		ros::NodeHandle nh;
+		sub_utm_ = nh.subscribe(utm_topic_, 1, &Recorder::odom_callback,this);
 		//已经处于记录状态,直接返回请求成功,不能作为重复请求或错误处理
 		//客户端请求记录后,服务器回传请求成功指令,然后客户端跳转到开始记录界面
 		//若长时间没有收到服务器回应,客户端超时返回
@@ -192,6 +197,7 @@ bool Recorder::recordPathService(interface::RecordPath::Request  &req,
 	//请求停止记录
 	else if(req.command_type == req.STOP_RECORD_PATH)
 	{
+		sub_utm_.shutdown();
 		//当前已经处于空闲状态,但仍然需要返回成功标志,
 		//与请求记录时原理一致.
 		if(this->status_ == RecorderIdle)
@@ -214,7 +220,6 @@ bool Recorder::recordPathService(interface::RecordPath::Request  &req,
 	return true;
 }
 
-
 float Recorder::calculate_dis2(gpsMsg_t & point1,gpsMsg_t& point2)
 {
 	float x = point1.x - point2.x;
@@ -236,7 +241,7 @@ void Recorder::odom_callback(const nav_msgs::Odometry::ConstPtr& msg)
 	current_point.y = msg->pose.pose.position.y;
 	current_point.yaw = msg->pose.covariance[0];
 	
-	//如果为处于曲线记录状态, 直接返回
+	//如果不是曲线记录状态, 直接返回
 	if(this->status_ != CurveRecording)
 		return;
 	
@@ -257,7 +262,7 @@ void Recorder::odom_callback(const nav_msgs::Odometry::ConstPtr& msg)
 	}
 }
 
-
+//记录路径时的错误信应反馈到显示器
 int main(int argc,char**argv)
 {
 	ros::init(argc,argv,"record_path_node");

@@ -55,7 +55,7 @@ SteerMotor::~SteerMotor()
 	}
 }
 
-bool SteerMotor::init(std::string serial_port,int baud_rate)
+bool SteerMotor::init(const std::string& serial_port,int baud_rate)
 {
 	if(!configure_port(serial_port, baud_rate))
 		return false;
@@ -63,6 +63,12 @@ bool SteerMotor::init(std::string serial_port,int baud_rate)
 	this->startRequestState(50);
 
 	return this->selfCheck();
+}
+
+bool SteerMotor::reInit(const std::string& serial_port,int baud_rate)
+{
+	this->stop();
+	return init(serial_port, baud_rate);
 }
 
 void SteerMotor::stop()
@@ -75,6 +81,12 @@ bool SteerMotor::configure_port(std::string port,int baud_rate)
 {
 	try 
 	{
+		if(serial_port_ != NULL && serial_port_->isOpen())
+		{
+			serial_port_->close();
+			delete serial_port_;
+			serial_port_ = NULL;
+		}
 		serial_port_ = new serial::Serial(port,baud_rate,serial::Timeout::simpleTimeout(10)); 
 
 		if (!serial_port_->isOpen())
@@ -91,9 +103,6 @@ bool SteerMotor::configure_port(std::string port,int baud_rate)
 	        output << "Serial port: " << port << " opened successfully." << std::endl;
 	        std::cout << output.str() <<std::endl;
 		}
-
-		serial_port_->flush();
-		
 	} 
 	catch (std::exception &e) 
 	{
@@ -103,6 +112,7 @@ bool SteerMotor::configure_port(std::string port,int baud_rate)
 	    return false;
 	}
 
+	serial_port_->flush();  //刷新发送接收缓冲区
 	return true;
 }
 
@@ -117,11 +127,16 @@ void SteerMotor::startReadSerial()
 
 void SteerMotor::stopReadSerial()
 {
-	is_read_serial_ = false;
+	is_read_serial_ = false; //促使线程退出while循环，然后退出线程
+
+	//线程退出之前，此处无法获得锁并阻塞，直到线程退出
+	std::lock_guard<std::mutex> lck(read_serial_thread_mutex_); 
 }
 
 void SteerMotor::readSerialThread()
 {
+	std::lock_guard<std::mutex> lck(read_serial_thread_mutex_);
+
 	serial_port_->flush(); //clear the old data from receive buffer
 	while ( is_read_serial_) 
 	{
@@ -308,6 +323,8 @@ void SteerMotor::startRequestState(int duration)
 //电机数据定时获请求线程
 void SteerMotor::requestStateThread(int duration)
 {
+	std::lock_guard<std::mutex> lck(request_state_thread_mutex_);
+
 	int cmd_inteval = 5; //指令间隔 ms
 	int i = 0;
 	while(is_request_state_)
@@ -361,7 +378,10 @@ bool SteerMotor::selfCheck()
 
 void SteerMotor::stopRequestState()
 {
-	is_request_state_ = false;
+	is_request_state_ = false; //促使线程退出while循环，然后退出线程
+
+	//线程退出之前，此处无法获得锁并阻塞，直到线程退出
+	std::lock_guard<std::mutex> lck(request_state_thread_mutex_); 
 }
 
 float SteerMotor::getRoadWheelAngle() const
