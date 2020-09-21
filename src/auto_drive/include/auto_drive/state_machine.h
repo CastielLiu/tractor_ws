@@ -23,7 +23,6 @@ public:
         State_VertexPathRecording = 11,
     };
 
-
     bool isRecording()
     {
         if(state == State_CurvePathRecording ||
@@ -34,8 +33,8 @@ public:
 
     bool isTracking()
     {
-        if(state == State_VertexTracking ||
-           state == State_CurveTracking)
+        if(state >= State_SuspendTracking && 
+           state <= State_CompleteTracking)
             return true;
         return false;
     }

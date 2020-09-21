@@ -7,10 +7,6 @@
 
 #define __NAME__ "record_path"
 
-#ifndef PI_
-#define PI_ 3.141592653589
-#endif
-
 /* current state   */
 #define RecorderIdle 1
 #define CurveRecording 2
@@ -33,8 +29,7 @@ public:
 	bool init();
 	void recordToFile();
 private:
-	bool recordPathService(interface::RecordPath::Request  &req,
-						   interface::RecordPath::Response &res);
+	
 	void odom_callback(const nav_msgs::Odometry::ConstPtr& msg);
 	float calculate_dis2(gpsMsg_t & point1,gpsMsg_t& point2);
 	bool is_location_ok();
@@ -103,123 +98,6 @@ float dis2Points(const gpsMsg_t& point1, const gpsMsg_t& point2,bool is_sqrt)
 	return x*x+y*y;
 }
 
-bool Recorder::recordPathService(interface::RecordPath::Request  &req,
-								 interface::RecordPath::Response &res)
-{
-	/*  由调用服务者判断定位是否有效，当前节点未订阅GPS消息，无法判断
-	if(!is_location_ok())
-	{
-		ROS_ERROR("Location status is abnormal, unable to record path");
-		res.success = Fail;
-		return true;
-	}
-	*/
-	//请求开始记录
-	if(req.command_type == req.START_RECORD_PATH )
-	{
-		ros::NodeHandle nh;
-		sub_utm_ = nh.subscribe(utm_topic_, 1, &Recorder::odom_callback,this);
-		//已经处于记录状态,直接返回请求成功,不能作为重复请求或错误处理
-		//客户端请求记录后,服务器回传请求成功指令,然后客户端跳转到开始记录界面
-		//若长时间没有收到服务器回应,客户端超时返回
-		//考虑传输错误等原因,服务器已经接收请求并回应,但客户端未成功接收的问题
-		//待客户端再次请求记录时，返回正确标志,以使得客户端页面正常跳转.
-		if((req.path_type ==req.CURVE_TYPE && this->status_ == CurveRecording) ||
-			(req.path_type ==req.VERTEX_TYPE && this->status_ == VertexRecording))
-		{
-			res.success = Success;
-			return true;
-		}
-		
-		//当前处于记录状态,但新请求记录方法与当前状态不符
-		//关闭正在记录的文件,并将状态复位
-		if(this->status_ == CurveRecording || this->status_ == VertexRecording)
-		{
-			fclose(fp_);
-			fp_ = NULL;
-			this->status_ = RecorderIdle;
-		}
-		
-		if(req.path_type ==req.CURVE_TYPE)
-		{
-			ROS_INFO("[%s] Request start record path: curve type.",__NAME__);
-			last_point = {0.0,0.0,0.0,0.0,0.0}; 
-			this->status_ = CurveRecording;
-		}
-		else if(req.path_type == req.VERTEX_TYPE)
-		{
-			ROS_INFO("[%s] Request start record path: vertex type.",__NAME__);
-			last_point = {0.0,0.0,0.0,0.0,0.0}; 
-			this->status_ = VertexRecording;
-		}
-		else
-		{
-			ROS_ERROR("[%s] Expected path type error !",__NAME__);
-			res.success = Fail;
-			return true;
-		}
-		
-		std::string file = file_path_ + req.path_file_name;
-		
-		fp_ = fopen(file.c_str(),"w");
-		if(fp_ == NULL)
-		{
-			ROS_ERROR("[%s] Open %s failed!",__NAME__, file.c_str());
-			res.success = Fail;
-			return true;
-		}
-		else
-			ROS_INFO("[%s] New path file: %s created.",__NAME__, file.c_str());
-	}
-	//请求记录当前点,仅对顶点型有效
-	else if(req.command_type == req.RECORD_CURRENT_POINT)
-	{
-		//若当前非顶点型记录中,大错误!
-		if(this->status_ != VertexRecording)
-		{
-			ROS_ERROR("[%s] Request record current point, but system is in vertex recording!",__NAME__);
-			res.success = Fail;
-			return true;
-		}
-		float dis = dis2Points(current_point, last_point, true);
-		
-		if(dis < 1.0)
-		{
-			ROS_ERROR("[%s] Request record current point, but too close to the previous point." __NAME__);
-			res.success = Fail;
-			return true;
-		}
-		ROS_INFO("[%s] record current point: %.3f\t%.3f\t%.3f ok.",current_point.x,current_point.y,current_point.yaw*180.0/PI_);
-		fprintf(fp_,"%.3f\t%.3f\t%.3f\r\n",current_point.x,current_point.y,current_point.yaw);
-		fflush(fp_);
-		last_point = current_point;
-	}
-	//请求停止记录
-	else if(req.command_type == req.STOP_RECORD_PATH)
-	{
-		sub_utm_.shutdown();
-		//当前已经处于空闲状态,但仍然需要返回成功标志,
-		//与请求记录时原理一致.
-		if(this->status_ == RecorderIdle)
-		{
-			res.success = Success;
-			if(fp_ != NULL)  //冗余判断
-			{
-				fclose(fp_);
-				fp_ = NULL;
-			}
-			return true;
-		}
-		ROS_INFO("[%s] Record path completed.",__NAME__);
-		fclose(fp_);
-		fp_ = NULL;
-		this->status_ = RecorderIdle;
-	}
-	
-	res.success = Success;
-	return true;
-}
-
 float Recorder::calculate_dis2(gpsMsg_t & point1,gpsMsg_t& point2)
 {
 	float x = point1.x - point2.x;
@@ -261,20 +139,4 @@ void Recorder::odom_callback(const nav_msgs::Odometry::ConstPtr& msg)
 		last_point = current_point;
 	}
 }
-
-//记录路径时的错误信应反馈到显示器
-int main(int argc,char**argv)
-{
-	ros::init(argc,argv,"record_path_node");
-	
-	Recorder recorder;
-	
-	if(!recorder.init())
-		return 0;
-
-	ros::spin();
-	
-	return 0;
-}
-
 

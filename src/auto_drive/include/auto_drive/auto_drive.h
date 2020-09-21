@@ -26,7 +26,10 @@ class AutoDrive
     void base_ctrl_state_callback(const driverless_msgs::BaseControlState::ConstPtr& msg);
     void update_timer_callback(const ros::TimerEvent&);
     bool driverlessService(interface::Driverless::Request  &req,
-									 interface::Driverless::Response &res);
+						   interface::Driverless::Response &res);
+    bool recordPathService(interface::RecordPath::Request  &req,
+						   interface::RecordPath::Response &res);
+
 	bool callDriverlessStatusService(uint8_t status);
 
   private: 
@@ -46,6 +49,7 @@ class AutoDrive
     ros::Timer update_timer_;
 
     ros::ServiceServer srv_driverless_;
+    ros::ServiceServer srv_recorder_;
     ros::NodeHandle nh_, nh_private_;
 
     std::shared_ptr<std::thread> auto_drive_thread_ptr_;

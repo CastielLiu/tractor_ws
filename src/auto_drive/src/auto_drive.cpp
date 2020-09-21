@@ -49,9 +49,9 @@ bool AutoDrive::init()
 
 	update_timer_ = nh_.createTimer(ros::Duration(0.05),&AutoDrive::update_timer_callback,this);
 
-    srv_driverless_ = nh_.advertiseService("driverless_service",&AutoDrive::driverlessService,this);
+    srv_driverless_ = nh_.advertiseService("driverless_service", &AutoDrive::driverlessService, this);
+	srv_recorder_   = nh_.advertiseService("record_path_service",&AutoDrive::recordPathService, this);
 }
-
 
 bool AutoDrive::driverlessService(interface::Driverless::Request  &req,
 								  interface::Driverless::Response &res)
@@ -204,7 +204,8 @@ void AutoDrive::autoDriveThread(float speed)
 
 void AutoDrive::update_timer_callback(const ros::TimerEvent&)
 {
-	if(state_.isTracking())
+	if(state_.get()==state_.State_VertexTracking ||
+	   state_.get()==state_.State_CurveTracking)
 	{
 		cmd_.driverless_mode = true;
 		cmd_.set_brake = 0;
@@ -242,4 +243,123 @@ void AutoDrive::odom_callback(const nav_msgs::Odometry::ConstPtr& msg)
 void AutoDrive::base_ctrl_state_callback(const driverless_msgs::BaseControlState::ConstPtr& msg)
 {
     roadwheel_angle_ = msg->roadWheelAngle;
+}
+
+bool AutoDrive::recordPathService(interface::RecordPath::Request  &req,
+						   		  interface::RecordPath::Response &res)
+{
+	//正在路径跟踪，禁用路径记录
+	//上位机逻辑正确的情况下不会出现这种情况
+	if(state_.isTracking()) 
+	{
+		res.success = res.FAIL;
+		return true;
+	}
+
+	if(req.command_type == req.START_RECORD_PATH ) //请求开始记录
+	{
+		if(state_.isRecording()) //正在记录
+
+
+
+
+
+
+
+			
+
+		if((req.path_type ==req.CURVE_TYPE && this->status_ == CurveRecording) ||
+			(req.path_type ==req.VERTEX_TYPE && this->status_ == VertexRecording))
+		{
+			res.success = Success;
+			return true;
+		}
+		
+		//当前处于记录状态,但新请求记录方法与当前状态不符
+		//关闭正在记录的文件,并将状态复位
+		if(this->status_ == CurveRecording || this->status_ == VertexRecording)
+		{
+			fclose(fp_);
+			fp_ = NULL;
+			this->status_ = RecorderIdle;
+		}
+		
+		if(req.path_type ==req.CURVE_TYPE)
+		{
+			ROS_INFO("[%s] Request start record path: curve type.",__NAME__);
+			last_point = {0.0,0.0,0.0,0.0,0.0}; 
+			this->status_ = CurveRecording;
+		}
+		else if(req.path_type == req.VERTEX_TYPE)
+		{
+			ROS_INFO("[%s] Request start record path: vertex type.",__NAME__);
+			last_point = {0.0,0.0,0.0,0.0,0.0}; 
+			this->status_ = VertexRecording;
+		}
+		else
+		{
+			ROS_ERROR("[%s] Expected path type error !",__NAME__);
+			res.success = Fail;
+			return true;
+		}
+		
+		std::string file = file_path_ + req.path_file_name;
+		
+		fp_ = fopen(file.c_str(),"w");
+		if(fp_ == NULL)
+		{
+			ROS_ERROR("[%s] Open %s failed!",__NAME__, file.c_str());
+			res.success = Fail;
+			return true;
+		}
+		else
+			ROS_INFO("[%s] New path file: %s created.",__NAME__, file.c_str());
+	}
+	//请求记录当前点,仅对顶点型有效
+	else if(req.command_type == req.RECORD_CURRENT_POINT)
+	{
+		//若当前非顶点型记录中,大错误!
+		if(this->status_ != VertexRecording)
+		{
+			ROS_ERROR("[%s] Request record current point, but system is in vertex recording!",__NAME__);
+			res.success = Fail;
+			return true;
+		}
+		float dis = dis2Points(current_point, last_point, true);
+		
+		if(dis < 1.0)
+		{
+			ROS_ERROR("[%s] Request record current point, but too close to the previous point." __NAME__);
+			res.success = Fail;
+			return true;
+		}
+		ROS_INFO("[%s] record current point: %.3f\t%.3f\t%.3f ok.",current_point.x,current_point.y,current_point.yaw*180.0/math.pi);
+		fprintf(fp_,"%.3f\t%.3f\t%.3f\r\n",current_point.x,current_point.y,current_point.yaw);
+		fflush(fp_);
+		last_point = current_point;
+	}
+	//请求停止记录
+	else if(req.command_type == req.STOP_RECORD_PATH)
+	{
+		sub_utm_.shutdown();
+		//当前已经处于空闲状态,但仍然需要返回成功标志,
+		//与请求记录时原理一致.
+		if(this->status_ == RecorderIdle)
+		{
+			res.success = Success;
+			if(fp_ != NULL)  //冗余判断
+			{
+				fclose(fp_);
+				fp_ = NULL;
+			}
+			return true;
+		}
+		ROS_INFO("[%s] Record path completed.",__NAME__);
+		fclose(fp_);
+		fp_ = NULL;
+		this->status_ = RecorderIdle;
+	}
+	
+	res.success = Success;
+	return true;
 }
