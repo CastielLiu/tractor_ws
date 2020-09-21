@@ -45,6 +45,7 @@ class BaseControl
 };
 
 BaseControl::BaseControl():
+	brake_value_(0),
 	lastBrakeValueTime_(0)
 {
 	

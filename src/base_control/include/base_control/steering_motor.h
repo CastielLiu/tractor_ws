@@ -48,6 +48,7 @@ class SteerMotor
 	void requestErrorMsg();
 	void setSteeringSpeed(uint8_t speed);
 	void setSteeringRotate(float cycleNum);
+	void sleep_ms(int ms);
 
 	uint16_t generateModBusCRC_byTable(const uint8_t *ptr,uint8_t size);
 	void BufferIncomingData(uint8_t *message, int length);

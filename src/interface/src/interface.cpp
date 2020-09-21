@@ -13,6 +13,7 @@ Interface::Interface():
 	tracking_info_flag_(false)
 {
 	can2serial_ = new Can2serial;
+	setlocale(LC_ALL, ""); //调试信息中文编码
 }
 
 Interface::~Interface()
@@ -85,8 +86,8 @@ void Interface::run()
 //根据can消息在新线程中请求对应的服务，防止阻塞接收线程
 void Interface::callServiceThread(const CanMsg_t& can_msg)
 {
-	static bool isRunning = false;
-	if(isRunning)
+	static bool threadIsRunning = false;
+	if(threadIsRunning)
 	{
 		can_pkgs_.response.data[0] = 0x02; //通用应答
 		can_pkgs_.response.data[1] = 0x00; //系统正忙
@@ -94,9 +95,9 @@ void Interface::callServiceThread(const CanMsg_t& can_msg)
 		return;
 	}
 
-	isRunning = true;
+	threadIsRunning = true;
 
-	if(can_msg.ID == RECORD_PATH_CAN_ID)
+	if(can_msg.ID == RECORD_PATH_CAN_ID) //记录路径ID
 	{
 		interface::RecordPath srv_record_path;
 		int file_seq = can_msg.data[1]*256 + can_msg.data[0];   //文件序号
@@ -106,11 +107,11 @@ void Interface::callServiceThread(const CanMsg_t& can_msg)
 		
 		srv_record_path.request.command_type = can_msg.data[3]; //指令类型，开始?停止?记录当前?
 		
-		ROS_INFO("\n[%s] <记录路径> 路径类型: (%d->顶点型, %d->连续型)\t 指令类型: (%d->开始记录, %d->停止记录, %d->记录当前)", __NAME__, 
+		ROS_INFO("\n[%s] <记录路径> \n\t路径类型: (%d->顶点型, %d->连续型)\t \n\t指令类型: (%d->开始记录, %d->停止记录, %d->记录当前)", __NAME__, 
 					srv_record_path.request.VERTEX_TYPE, srv_record_path.request.CURVE_TYPE,
 					srv_record_path.request.START_RECORD_PATH, srv_record_path.request.STOP_RECORD_PATH, srv_record_path.request.RECORD_CURRENT_POINT);
 				
-		ROS_INFO("[%s] Request recod path: %s\t type:%d\t cmd:%d",__NAME__, 
+		ROS_INFO("[%s] <Request Recod Path>: %s\t type:%d\t cmd:%d",__NAME__, 
 							srv_record_path.request.path_file_name.c_str(),
 							srv_record_path.request.path_type,
 							srv_record_path.request.command_type);
@@ -131,7 +132,7 @@ void Interface::callServiceThread(const CanMsg_t& can_msg)
 												+ std::to_string(srv_driverless.request.path_type)+".txt";
 		srv_driverless.request.speed = can_msg.data[4];
 
-		ROS_INFO("\n[%s] <自动驾驶> 路径类型: (%d->顶点型, %d->连续型)\t 指令类型: (%d->开始, %d->停止, %d->暂停， %d->停止确认)", __NAME__, 
+		ROS_INFO("[%s] <自动驾驶> \n\t路径类型: (%d->顶点型, %d->连续型)\t \n\t指令类型: (%d->开始, %d->停止, %d->暂停， %d->停止确认)", __NAME__, 
 					srv_driverless.request.VERTEX_TYPE, srv_driverless.request.CURVE_TYPE,
 					srv_driverless.request.START, srv_driverless.request.STOP, srv_driverless.request.SUSPEND, srv_driverless.request.CONFIRM_STOP);
 
@@ -156,7 +157,7 @@ void Interface::callServiceThread(const CanMsg_t& can_msg)
 			;
 	}
 
-	isRunning = false;
+	threadIsRunning = false;
 }
 
 void Interface::readCanMsg()
@@ -262,6 +263,7 @@ void Interface::heartbeat_callback(const ros::TimerEvent& event)
 	memcpy(can_pkgs_.heartbeat.data, &heart_beat_pkg_, sizeof(heart_beat_pkg_));
 	
 	can2serial_->sendCanMsg(can_pkgs_.heartbeat);
+	//can2serial_->showCanMsg(can_pkgs_.heartbeat);
 }
 
 int main(int argc,char** argv)

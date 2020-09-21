@@ -22,7 +22,8 @@ uint8 brake_val #0-100
 uint8 brakeError
 
 uint8 BRAKE_ERROR_NONE = 0
-uint8 BRAKE_ERROR_OFFLINE = 100
+uint8 BRAKE_ERROR_OFFLINE = 1
+uint8 BRAKE_ERROR_ABNORMAL = 2
 
 
 

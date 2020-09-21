@@ -241,8 +241,10 @@ void SteerMotor::BufferIncomingData(uint8_t *message, int length)
                 uint16_t rawVal = pkg_buffer[3]*256 + pkg_buffer[4];
                 
                 if(response_data_type_ == DataResponse_AdcValue)
+				{
 					road_wheel_angle_ = 1.0 * rawVal * road_wheel_angle_resolution_ + road_wheel_angle_offset_;
-					
+					//std::cout << "road_wheel_angle_: " << road_wheel_angle_ << std::endl;
+				}
                 else if(response_data_type_ == DataResponse_EnableStatus)
                     is_enabled_ = (rawVal>0);
                     
@@ -331,19 +333,24 @@ void SteerMotor::requestStateThread(int duration)
 	{
 		++i; 
         this->requestMotorSpeed();
-        std::this_thread::sleep_for(std::chrono::microseconds(cmd_inteval)); 
+        sleep_ms(cmd_inteval); 
 
+		if(i%3 == 0)
+		{
+			this->requestAdcValue();
+			sleep_ms(cmd_inteval);
+		}
 		if(i%5 == 0)
 		{
 			this->requestEnableStatus();
-        	std::this_thread::sleep_for(std::chrono::microseconds(cmd_inteval));
+        	sleep_ms(cmd_inteval);
 		}
 		if(i%10 == 0)
    		{
 			this->requestErrorMsg();
-			std::this_thread::sleep_for(std::chrono::microseconds(cmd_inteval));
+			sleep_ms(cmd_inteval);
     	}
-		std::this_thread::sleep_for(std::chrono::microseconds(duration));
+		sleep_ms(duration);
 	}
 }
 
@@ -363,7 +370,7 @@ bool SteerMotor::selfCheck()
 		}
 			 
 		this->enable(); //尝试使能
-		std::this_thread::sleep_for(std::chrono::microseconds(100)); //等待
+		sleep_ms(100); //等待
 
 		if(this->is_enabled_)
 		{
@@ -597,7 +604,7 @@ uint16_t SteerMotor::generateModBusCRC_byTable(const uint8_t *ptr,uint8_t size)
 
 void SteerMotor::setRoadWheelAngle(float angle)
 {
-    static uint8_t rotate_speed_min = 10;
+    static uint8_t rotate_speed_min = 5;
     static uint8_t rotate_speed_max = 40;
     static float angle_diff_max = 40; //deg
     
@@ -631,6 +638,10 @@ void SteerMotor::rotate(float angle, uint8_t speed)
 	setSteeringRotate(cycleNum);
 }
 
+void SteerMotor::sleep_ms(int ms)
+{
+	std::this_thread::sleep_for(std::chrono::microseconds(ms));
+}
 
 
 
