@@ -66,26 +66,39 @@ bool Recorder::init()
 	
 	private_nh.param<std::string>("file_path",file_path_,"");
 	private_nh.param<float>("sample_distance",sample_distance_,0.1);
-	private_nh.param<std::string>("utm_topic", utm_topic_, "");
-	
-	if(utm_topic_.empty())
-	{
-		ROS_ERROR("[%s] Please input utm_topic in launch file!", __NAME__);
-		return false;
-	}
 	
 	if(file_path_.empty())
 	{
 		ROS_ERROR("[%s] Please input record file path in launch file!", __NAME__);
 		return false;
 	}
-	
-	//创建服务,用于外部触发记录路径
-	srv_record_path_ = nh.advertiseService("record_path_service",&Recorder::recordPathService,this);
-	
-	//sub_utm_ = nh.subscribe(utm_topic_, 1, &Recorder::odom_callback,this);
-	
 	return true;
+}
+
+bool Recorder::openShortFile(const std::string& short_file)
+{
+	std::string file = file_path_ + short_file;
+	fp_ = fopen(file.c_str(),"w");
+	if(fp_ == NULL)
+	{
+		ROS_ERROR("[%s] Open %s failed!",__NAME__, file.c_str());
+		return false;
+	}
+	else
+		ROS_INFO("[%s] New path file: %s created.",__NAME__, file.c_str());
+	return true;
+}
+
+bool Recorder::startCurvePathRecord()
+{
+		std::string file = file_path_ + req.path_file_name;
+		
+		
+}
+
+bool Recorder::startVertexPathRecord()
+{
+
 }
 
 float dis2Points(const gpsMsg_t& point1, const gpsMsg_t& point2,bool is_sqrt)
@@ -103,13 +116,6 @@ float Recorder::calculate_dis2(gpsMsg_t & point1,gpsMsg_t& point2)
 	float x = point1.x - point2.x;
 	float y = point1.y - point2.y;
 	return x*x+y*y;
-}
-
-bool Recorder::is_location_ok()
-{
-	if(fabs(current_point.x) < 1.0 && fabs(current_point.y) < 1.0)
-		return false;
-	return true;
 }
 
 void Recorder::odom_callback(const nav_msgs::Odometry::ConstPtr& msg)

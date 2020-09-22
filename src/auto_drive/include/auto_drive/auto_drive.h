@@ -63,6 +63,7 @@ class AutoDrive
 
     PathTracking tracker_;
     Avoiding avoider_;
+    Recorder recorder_;
 
 };
 

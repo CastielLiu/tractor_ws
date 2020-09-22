@@ -259,42 +259,37 @@ bool AutoDrive::recordPathService(interface::RecordPath::Request  &req,
 	if(req.command_type == req.START_RECORD_PATH ) //请求开始记录
 	{
 		if(state_.isRecording()) //正在记录
-
-
-
-
-
-
-
-			
-
-		if((req.path_type ==req.CURVE_TYPE && this->status_ == CurveRecording) ||
-			(req.path_type ==req.VERTEX_TYPE && this->status_ == VertexRecording))
 		{
-			res.success = Success;
-			return true;
+			recorder_.stop(); //终止当前记录
+			state_.set(state_.State_SystemIdle);
 		}
-		
-		//当前处于记录状态,但新请求记录方法与当前状态不符
-		//关闭正在记录的文件,并将状态复位
-		if(this->status_ == CurveRecording || this->status_ == VertexRecording)
-		{
-			fclose(fp_);
-			fp_ = NULL;
-			this->status_ = RecorderIdle;
-		}
-		
-		if(req.path_type ==req.CURVE_TYPE)
+
+		if(req.path_type ==req.CURVE_TYPE) //记录连续型路径
 		{
 			ROS_INFO("[%s] Request start record path: curve type.",__NAME__);
-			last_point = {0.0,0.0,0.0,0.0,0.0}; 
-			this->status_ = CurveRecording;
+			state_.set(state_.State_CurvePathRecording);
+
+			//开始连续型路径记录，传入文件名、位置获取函数
+			bool ok = recorder_.startCurvePathRecord(req.path_file_name, &AutoDrive::currentPose, this);
+			if(!ok)
+			{
+				res.success = Fail;
+				return true;
+			}
+			
 		}
 		else if(req.path_type == req.VERTEX_TYPE)
 		{
 			ROS_INFO("[%s] Request start record path: vertex type.",__NAME__);
-			last_point = {0.0,0.0,0.0,0.0,0.0}; 
-			this->status_ = VertexRecording;
+			state_.set(state_.State_VertexPathRecording);
+
+			//开始顶点型路径记录
+			bool ok = recorder_.startVertexPathRecord(req.path_file_name);
+			if(!ok)
+			{
+				res.success = Fail;
+				return true;
+			}
 		}
 		else
 		{
@@ -302,18 +297,6 @@ bool AutoDrive::recordPathService(interface::RecordPath::Request  &req,
 			res.success = Fail;
 			return true;
 		}
-		
-		std::string file = file_path_ + req.path_file_name;
-		
-		fp_ = fopen(file.c_str(),"w");
-		if(fp_ == NULL)
-		{
-			ROS_ERROR("[%s] Open %s failed!",__NAME__, file.c_str());
-			res.success = Fail;
-			return true;
-		}
-		else
-			ROS_INFO("[%s] New path file: %s created.",__NAME__, file.c_str());
 	}
 	//请求记录当前点,仅对顶点型有效
 	else if(req.command_type == req.RECORD_CURRENT_POINT)
