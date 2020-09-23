@@ -10,6 +10,7 @@
 #include <std_msgs/UInt8.h>
 #include <driverless_msgs/BaseControlState.h>
 #include "state_machine.h"
+#include <shared_mutex>
 #include"ros/ros.h"
 
 namespace fs = boost::filesystem;
@@ -32,12 +33,15 @@ class AutoDrive
 
 	bool callDriverlessStatusService(uint8_t status);
 
+private:
+    const gpsMsg_t currentPose();
   private: 
     float max_speed_;
 	float vehicle_speed_;
 	float roadwheel_angle_;
 	float max_roadwheelAngle_;
-    gpsMsg_t vehicle_point_;
+    gpsMsg_t pose_;
+    std::shared_mutex pose_wr_mutex_;
     std::string path_file_dir_;
     path_t path_;
 

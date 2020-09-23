@@ -38,7 +38,7 @@ bool AutoDrive::init()
 	sub_state_ = nh_.subscribe("/base_control_state", 1, &AutoDrive::base_ctrl_state_callback, this);
 
 	// wait for system ok
-	while(ros::ok() && !is_gps_data_valid(vehicle_point_))
+	while(ros::ok() && !is_gps_data_valid(pose_))
 	{
 		ROS_INFO("[AutoDrive]: gps data is invalid, please check the gps topic or waiting...");
 		ros::Duration(0.5).sleep();
@@ -123,7 +123,7 @@ bool AutoDrive::driverlessService(interface::Driverless::Request  &req,
 
 		//初始化跟踪控制器
 		tracker_.setPath(path_);
-		if(!tracker_.init(vehicle_point_))
+		if(!tracker_.init(pose_))
 		{
 			res.success = res.FAIL;
 			state_.set(state_.State_SystemIdle);
@@ -180,8 +180,10 @@ void AutoDrive::autoDriveThread(float speed)
 		if((state_.get() == state_.State_CompleteTracking) || 
 		   (state_.get() == state_.State_SystemIdle))
 			break;
-			
-		bool update_state = tracker_.update(vehicle_speed_, roadwheel_angle_, vehicle_point_, avoid_offset_);
+		
+		pose_wr_mutex_.lock_shared();
+		bool update_state = tracker_.update(vehicle_speed_, roadwheel_angle_, pose_, avoid_offset_);
+		pose_wr_mutex_.unlock_shared();
 
         if(!update_state) //更新失败,抵达目标地或出现异常
         {
@@ -231,18 +233,26 @@ void AutoDrive::update_timer_callback(const ros::TimerEvent&)
 
 void AutoDrive::odom_callback(const nav_msgs::Odometry::ConstPtr& msg)
 {
-	vehicle_point_.x = msg->pose.pose.position.x;
-	vehicle_point_.y = msg->pose.pose.position.y;
-	vehicle_point_.yaw = msg->pose.covariance[0];
+	std::unique_lock<std::shared_mutex> write_lock(pose_wr_mutex_);
+	pose_.x = msg->pose.pose.position.x;
+	pose_.y = msg->pose.pose.position.y;
+	pose_.yaw = msg->pose.covariance[0];
 	
-	vehicle_point_.longitude = msg->pose.covariance[1];
-	vehicle_point_.latitude = msg->pose.covariance[2];
+	pose_.longitude = msg->pose.covariance[1];
+	pose_.latitude = msg->pose.covariance[2];
 }
 
 //获取前轮转角值
 void AutoDrive::base_ctrl_state_callback(const driverless_msgs::BaseControlState::ConstPtr& msg)
 {
     roadwheel_angle_ = msg->roadWheelAngle;
+}
+
+//作为回调函数为调用方提供信息
+const gpsMsg_t AutoDrive::currentPose()
+{
+	std::shared_lock<std::shared_mutex> read_lock(pose_wr_mutex_);
+	return pose_;
 }
 
 bool AutoDrive::recordPathService(interface::RecordPath::Request  &req,
