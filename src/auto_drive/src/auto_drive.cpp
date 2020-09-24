@@ -231,30 +231,6 @@ void AutoDrive::update_timer_callback(const ros::TimerEvent&)
 	pub_state_.publish(state);
 }
 
-void AutoDrive::odom_callback(const nav_msgs::Odometry::ConstPtr& msg)
-{
-	std::unique_lock<std::shared_mutex> write_lock(pose_wr_mutex_);
-	pose_.x = msg->pose.pose.position.x;
-	pose_.y = msg->pose.pose.position.y;
-	pose_.yaw = msg->pose.covariance[0];
-	
-	pose_.longitude = msg->pose.covariance[1];
-	pose_.latitude = msg->pose.covariance[2];
-}
-
-//获取前轮转角值
-void AutoDrive::base_ctrl_state_callback(const driverless_msgs::BaseControlState::ConstPtr& msg)
-{
-    roadwheel_angle_ = msg->roadWheelAngle;
-}
-
-//作为回调函数为调用方提供信息
-const gpsMsg_t AutoDrive::currentPose()
-{
-	std::shared_lock<std::shared_mutex> read_lock(pose_wr_mutex_);
-	return pose_;
-}
-
 bool AutoDrive::recordPathService(interface::RecordPath::Request  &req,
 						   		  interface::RecordPath::Response &res)
 {
@@ -270,7 +246,7 @@ bool AutoDrive::recordPathService(interface::RecordPath::Request  &req,
 	{
 		if(state_.isRecording()) //正在记录
 		{
-			recorder_.stop(); //终止当前记录
+			recorder_.forceQuit(); //强制终止当前记录
 			state_.set(state_.State_SystemIdle);
 		}
 
@@ -285,8 +261,7 @@ bool AutoDrive::recordPathService(interface::RecordPath::Request  &req,
 			{
 				res.success = Fail;
 				return true;
-			}
-			
+			}////////////////
 		}
 		else if(req.path_type == req.VERTEX_TYPE)
 		{
@@ -334,7 +309,6 @@ bool AutoDrive::recordPathService(interface::RecordPath::Request  &req,
 	//请求停止记录
 	else if(req.command_type == req.STOP_RECORD_PATH)
 	{
-		sub_utm_.shutdown();
 		//当前已经处于空闲状态,但仍然需要返回成功标志,
 		//与请求记录时原理一致.
 		if(this->status_ == RecorderIdle)
@@ -355,4 +329,28 @@ bool AutoDrive::recordPathService(interface::RecordPath::Request  &req,
 	
 	res.success = Success;
 	return true;
+}
+
+void AutoDrive::odom_callback(const nav_msgs::Odometry::ConstPtr& msg)
+{
+	std::unique_lock<std::shared_mutex> write_lock(pose_wr_mutex_);
+	pose_.x = msg->pose.pose.position.x;
+	pose_.y = msg->pose.pose.position.y;
+	pose_.yaw = msg->pose.covariance[0];
+	
+	pose_.longitude = msg->pose.covariance[1];
+	pose_.latitude = msg->pose.covariance[2];
+}
+
+//获取前轮转角值
+void AutoDrive::base_ctrl_state_callback(const driverless_msgs::BaseControlState::ConstPtr& msg)
+{
+    roadwheel_angle_ = msg->roadWheelAngle;
+}
+
+//作为回调函数为调用方提供信息
+const gpsMsg_t AutoDrive::currentPose()
+{
+	std::shared_lock<std::shared_mutex> read_lock(pose_wr_mutex_);
+	return pose_;
 }
