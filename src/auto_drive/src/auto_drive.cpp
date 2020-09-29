@@ -259,11 +259,11 @@ bool AutoDrive::recordPathService(interface::RecordPath::Request  &req,
 			bool ok = recorder_.startCurvePathRecord(req.path_file_name, &AutoDrive::currentPose, this);
 			if(!ok)
 			{
-				res.success = Fail;
+				res.success = res.Fail;
 				return true;
-			}////////////////
+			}
 		}
-		else if(req.path_type == req.VERTEX_TYPE)
+		else if(req.path_type == req.VERTEX_TYPE) //顶点型路径记录
 		{
 			ROS_INFO("[%s] Request start record path: vertex type.",__NAME__);
 			state_.set(state_.State_VertexPathRecording);
@@ -272,39 +272,29 @@ bool AutoDrive::recordPathService(interface::RecordPath::Request  &req,
 			bool ok = recorder_.startVertexPathRecord(req.path_file_name);
 			if(!ok)
 			{
-				res.success = Fail;
+				res.success = res.Fail;
 				return true;
 			}
 		}
 		else
 		{
 			ROS_ERROR("[%s] Expected path type error !",__NAME__);
-			res.success = Fail;
+			res.success = res.Fail;
 			return true;
 		}
 	}
 	//请求记录当前点,仅对顶点型有效
 	else if(req.command_type == req.RECORD_CURRENT_POINT)
 	{
-		//若当前非顶点型记录中,大错误!
-		if(this->status_ != VertexRecording)
+		//若当前非顶点型记录中,上位机逻辑错误
+		if(state_.get() != State_VertexPathRecording)
 		{
-			ROS_ERROR("[%s] Request record current point, but system is in vertex recording!",__NAME__);
-			res.success = Fail;
+			ROS_ERROR("[%s] Request record current point, but system is not in vertex recording!",__NAME__);
+			res.success = res.Fail;
 			return true;
 		}
-		float dis = dis2Points(current_point, last_point, true);
-		
-		if(dis < 1.0)
-		{
-			ROS_ERROR("[%s] Request record current point, but too close to the previous point." __NAME__);
-			res.success = Fail;
-			return true;
-		}
-		ROS_INFO("[%s] record current point: %.3f\t%.3f\t%.3f ok.",current_point.x,current_point.y,current_point.yaw*180.0/math.pi);
-		fprintf(fp_,"%.3f\t%.3f\t%.3f\r\n",current_point.x,current_point.y,current_point.yaw);
-		fflush(fp_);
-		last_point = current_point;
+
+		bool ok = recorder_.recordCurrentVertex(pose_);
 	}
 	//请求停止记录
 	else if(req.command_type == req.STOP_RECORD_PATH)

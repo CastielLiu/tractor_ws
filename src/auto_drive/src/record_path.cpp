@@ -7,15 +7,6 @@
 
 #define __NAME__ "record_path"
 
-/* current state   */
-#define RecorderIdle 1
-#define CurveRecording 2
-#define VertexRecording 3
-
-/*recod path response*/
-#define Success 0
-#define Fail    1
-
 /* record path node for intelligent tractor
  * author: liushuaipeng, southeast university
  * email:  castiel_liu@outlook.com
@@ -23,10 +14,11 @@
 
 
 Recorder::Recorder():
-	status_(RecorderIdle)
 {
 	last_point = {0.0,0.0,0.0,0.0,0.0};
 	current_point = last_point;
+	vertex_recorder_state_ = VertexPathRecorderState_Idle;
+	curve_recorder_state_ = CurvePathRecorderState_Idle;
 }
 
 Recorder::~Recorder()
@@ -122,9 +114,64 @@ bool Recorder::curvePathRecordThread()
 
 }
 
+bool Recorder::startVertexPathRecord(const std::string& file_name)
+{
+	full_file_now_ = file_dir_ + file_name;
+
+	if(!tryOpenFile(full_file_now_))        //新建并打开路径文件
+		return false;
+	
+	vertex_recorder_state_ = VertexPathRecorderState_Waiting;
+	return true;
+}
+
+/*@brief 停止顶点型路径记录
+ *@param discard 是否放弃当前记录，放弃/保存
+ */
+void Recorder::stopVertexRecord(bool discard)
+{
+	if(vertex_recorder_state_ == VertexPathRecorderState_Idle)
+		return ;
+		
+	vertex_recorder_state_ = VertexPathRecorderState_Idle;
+
+	if(discard)
+	{
+		std::string rm_cmd = std::string("rm ") + full_file_now_;
+		system(rm_cmd.c_str());
+	}
+}
+
+bool Recorder::recordCurrentVertex(const gpsMsg_t& pose)
+{
+	if(vertex_recorder_state_ != VertexPathRecorderState_Waiting)
+		return false;
+
+		float dis = dis2Points(current_point, last_point, true);
+		
+		if(dis < 1.0)
+		{
+			ROS_ERROR("[%s] Request record current point, but too close to the previous point." __NAME__);
+			res.success = res.Fail;
+			return true;
+		}
+		ROS_INFO("[%s] record current point: %.3f\t%.3f\t%.3f ok.",current_point.x,current_point.y,current_point.yaw*180.0/math.pi);
+		fprintf(fp_,"%.3f\t%.3f\t%.3f\r\n",current_point.x,current_point.y,current_point.yaw);
+		fflush(fp_);
+		last_point = current_point;
+
+
+		
+	printf("[%s] recoding: %.3f\t%.3f\t%.3f\r\n",__NAME__, pose.x,pose.y,pose.yaw);
+	fprintf(fp_,"%.3f\t%.3f\t%.3f\r\n",pose.x,pose.y,pose.yaw);
+	fflush(fp_);
+	return true;
+}
+
 void Recorder::forceQuit()
 {
 	stopCurveRecord(true); //退出连续路径记录器，并丢弃记录文件
+	stopVertexRecord(true); //退出顶点路径记录器，并丢弃记录文件
 }
 
 float Recorder::calculate_dis2(gpsMsg_t & point1,gpsMsg_t& point2)

@@ -51,9 +51,14 @@ private:
 		t.detach();
 		return true;
 	}
-	void forceQuit();
 	void stopCurveRecord(bool discard);
 	void curvePathRecordThread();
+
+	bool startVertexPathRecord(const std::string& file_name);
+	bool recordCurrentVertex(const gpsMsg_t& pose);
+	void stopVertexRecord(bool discard);
+
+	void forceQuit();
 
 	void sleep_ms(int ms);
 	float calculate_dis2(gpsMsg_t & point1,gpsMsg_t& point2);
@@ -63,7 +68,7 @@ private:
 	std::string full_file_now_;      //当前正在记录的文件全名
 	uint8_t curve_recorder_state_;   //连续路径记录器状态
 	uint8_t vertex_recorder_state_;  //顶点路径记录器状态
-	std::mutex curve_recorder_mutex_;//连续路径记录线程互斥量，用于判断县城是否已经退出
+	std::mutex curve_recorder_mutex_;//连续路径记录线程互斥量，用于判断线程是否已经退出
 	FILE *fp_;                       //路径文件句柄
 	
 	gpsMsg_t last_point_ , current_point_;
@@ -72,5 +77,4 @@ private:
 	float sample_distance_;
 	ros::ServiceServer srv_record_path_;
 	ros::Subscriber sub_utm_ ;
-	int status_;
 };
