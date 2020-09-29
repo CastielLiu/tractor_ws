@@ -246,7 +246,7 @@ bool AutoDrive::recordPathService(interface::RecordPath::Request  &req,
 	{
 		if(state_.isRecording()) //正在记录
 		{
-			recorder_.forceQuit(); //强制终止当前记录
+			recorder_.stopWithoutSave(); //强制终止当前记录
 			state_.set(state_.State_SystemIdle);
 		}
 
@@ -295,6 +295,11 @@ bool AutoDrive::recordPathService(interface::RecordPath::Request  &req,
 		}
 
 		bool ok = recorder_.recordCurrentVertex(pose_);
+		if(!ok)
+		{
+			res.success = res.Fail;
+			return true;
+		}
 	}
 	//请求停止记录
 	else if(req.command_type == req.STOP_RECORD_PATH)
@@ -304,16 +309,10 @@ bool AutoDrive::recordPathService(interface::RecordPath::Request  &req,
 		if(this->status_ == RecorderIdle)
 		{
 			res.success = Success;
-			if(fp_ != NULL)  //冗余判断
-			{
-				fclose(fp_);
-				fp_ = NULL;
-			}
 			return true;
 		}
 		ROS_INFO("[%s] Record path completed.",__NAME__);
-		fclose(fp_);
-		fp_ = NULL;
+		recorder_.stopAndSave();
 		this->status_ = RecorderIdle;
 	}
 	

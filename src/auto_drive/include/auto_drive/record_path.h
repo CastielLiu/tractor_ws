@@ -1,3 +1,6 @@
+#ifndef PATH_RECORDER_H_
+#define PATH_RECORDER_H_
+
 #include <ros/ros.h>
 #include <unistd.h>
 #include <cmath>
@@ -6,6 +9,8 @@
 #include "auto_drive/structs.h"
 #include <functional>
 #include <thread>
+#include <shared_mutex>
+#include <mutex>
 
 /* record path node for intelligent tractor
  * author: liushuaipeng, southeast university
@@ -15,11 +20,13 @@
 class Recorder
 {
 public:
-	typedef const gpsMsg_t (*getPoseFun_t)(void); //定义函数指针
+	typedef const gpsMsg_t (getPoseFun_t)(void); //定义函数指针
+	
 	Recorder();
 	~Recorder();
 	bool init();
-	void recordToFile();
+	void stopWithoutSave();
+	void stopAndSave();
 private:
 	bool recordPathService(interface::RecordPath::Request  &req,
 						   interface::RecordPath::Response &res);
@@ -38,7 +45,8 @@ private:
 		VertexPathRecorderState_RecordNow,
 	};
 
-	template <typename ClassT>
+	void curvePathRecordThread();
+	template <typename classT>
 	bool startCurvePathRecord(const std::string& file_name, const gpsMsg_t (classT::*fun)(void),classT* obj)
 	{
 		full_file_now_ = file_dir_ + file_name;
@@ -52,17 +60,14 @@ private:
 		return true;
 	}
 	void stopCurveRecord(bool discard);
-	void curvePathRecordThread();
 
 	bool startVertexPathRecord(const std::string& file_name);
 	bool recordCurrentVertex(const gpsMsg_t& pose);
 	void stopVertexRecord(bool discard);
 
-	void forceQuit();
-
 	void sleep_ms(int ms);
 	float calculate_dis2(gpsMsg_t & point1,gpsMsg_t& point2);
-	bool is_location_ok();
+	bool is_location_ok(const gpsMsg_t pose);
 
 	std::string file_dir_;           //路径文件所在目录
 	std::string full_file_now_;      //当前正在记录的文件全名
@@ -78,3 +83,5 @@ private:
 	ros::ServiceServer srv_record_path_;
 	ros::Subscriber sub_utm_ ;
 };
+
+#endif
