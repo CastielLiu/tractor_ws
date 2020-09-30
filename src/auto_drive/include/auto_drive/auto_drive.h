@@ -1,20 +1,27 @@
 #ifndef AUTO_DRIVE_H_
 #define AUTO_DRIVE_H_
 
+#include <boost/thread/locks.hpp>    
+#include <boost/thread/shared_mutex.hpp>    
+
 #include "auto_drive/record_path.h"
 #include "auto_drive/path_tracking.h"
 #include "auto_drive/avoiding.h"
 #include <nav_msgs/Odometry.h>
+#include <driverless_msgs/BaseControlState.h>
 #include <interface/DriverlessStatus.h>
 #include <interface/Driverless.h>
 #include <std_srvs/Empty.h>
 #include <std_msgs/UInt8.h>
-#include <driverless_msgs/BaseControlState.h>
 #include "state_machine.h"
 #include <shared_mutex>
 #include"ros/ros.h"
 
 namespace fs = boost::filesystem;
+
+typedef boost::shared_mutex shared_mutex_t;
+typedef boost::unique_lock<shared_mutex_t> write_lock_t;
+typedef boost::shared_lock<shared_mutex_t> read_lock_t;
 
 class AutoDrive 
 {
@@ -42,7 +49,7 @@ private:
 	float roadwheel_angle_;
 	float max_roadwheelAngle_;
     gpsMsg_t pose_;
-    std::shared_mutex pose_wr_mutex_;
+    shared_mutex_t pose_wr_mutex_;
     std::string path_file_dir_;
     path_t path_;
 

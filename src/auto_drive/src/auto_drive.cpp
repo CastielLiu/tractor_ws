@@ -322,7 +322,7 @@ bool AutoDrive::recordPathService(interface::RecordPath::Request  &req,
 
 void AutoDrive::odom_callback(const nav_msgs::Odometry::ConstPtr& msg)
 {
-	std::unique_lock<std::shared_mutex> write_lock(pose_wr_mutex_);
+	write_lock_t write_lock(pose_wr_mutex_);
 	pose_.x = msg->pose.pose.position.x;
 	pose_.y = msg->pose.pose.position.y;
 	pose_.yaw = msg->pose.covariance[0];
@@ -340,6 +340,6 @@ void AutoDrive::base_ctrl_state_callback(const driverless_msgs::BaseControlState
 //作为回调函数为调用方提供信息
 const gpsMsg_t AutoDrive::currentPose()
 {
-	std::shared_lock<std::shared_mutex> read_lock(pose_wr_mutex_);
+	read_lock_t read_lock(pose_wr_mutex_);
 	return pose_;
 }
