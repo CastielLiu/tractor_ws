@@ -7,9 +7,9 @@
 #include <nav_msgs/Odometry.h>
 #include <interface/RecordPath.h>
 #include "auto_drive/structs.h"
+#include "auto_drive/function.h"
 #include <functional>
 #include <thread>
-#include <shared_mutex>
 #include <mutex>
 
 /* record path node for intelligent tractor
@@ -27,10 +27,6 @@ public:
 	bool init();
 	void stopWithoutSave();
 	void stopAndSave();
-private:
-	bool recordPathService(interface::RecordPath::Request  &req,
-						   interface::RecordPath::Response &res);
-	bool tryOpenFile(const std::string& full_file);
 
 	enum CurvePathRecorderState
 	{
@@ -65,6 +61,9 @@ private:
 	bool recordCurrentVertex(const gpsMsg_t& pose);
 	void stopVertexRecord(bool discard);
 
+private:
+	bool tryOpenFile(const std::string& full_file);
+	
 	void sleep_ms(int ms);
 	float calculate_dis2(gpsMsg_t & point1,gpsMsg_t& point2);
 	bool is_location_ok(const gpsMsg_t pose);

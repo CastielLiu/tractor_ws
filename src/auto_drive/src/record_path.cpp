@@ -29,27 +29,13 @@ bool Recorder::init()
 	private_nh.param<std::string>("file_path",file_dir_,"");
 	private_nh.param<float>("sample_distance",sample_distance_,0.1);
 	
-	
 	if(file_dir_.empty())
 	{
 		ROS_ERROR("[%s] Please input record file path in launch file!", __NAME__);
 		return false;
 	}
 	
-	//创建服务,用于外部触发记录路径
-	srv_record_path_ = nh.advertiseService("record_path_service",&Recorder::recordPathService,this);
-	
 	return true;
-}
-
-float dis2Points(const gpsMsg_t& point1, const gpsMsg_t& point2,bool is_sqrt)
-{
-	float x = point1.x - point2.x;
-	float y = point1.y - point2.y;
-	
-	if(is_sqrt)
-		return sqrt(x*x +y*y);
-	return x*x+y*y;
 }
 
 bool Recorder::tryOpenFile(const std::string& full_file)

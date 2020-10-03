@@ -11,4 +11,6 @@ uint8  CURVE_TYPE =101
 
 ---
 
+uint8  SUCCESS = 0
+uint8  FAIL    = 1
 uint8  success

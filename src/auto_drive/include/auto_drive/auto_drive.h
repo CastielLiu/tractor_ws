@@ -14,7 +14,6 @@
 #include <std_srvs/Empty.h>
 #include <std_msgs/UInt8.h>
 #include "state_machine.h"
-#include <shared_mutex>
 #include"ros/ros.h"
 
 namespace fs = boost::filesystem;

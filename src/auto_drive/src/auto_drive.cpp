@@ -259,7 +259,7 @@ bool AutoDrive::recordPathService(interface::RecordPath::Request  &req,
 			bool ok = recorder_.startCurvePathRecord(req.path_file_name, &AutoDrive::currentPose, this);
 			if(!ok)
 			{
-				res.success = res.Fail;
+				res.success = res.FAIL;
 				return true;
 			}
 		}
@@ -272,14 +272,14 @@ bool AutoDrive::recordPathService(interface::RecordPath::Request  &req,
 			bool ok = recorder_.startVertexPathRecord(req.path_file_name);
 			if(!ok)
 			{
-				res.success = res.Fail;
+				res.success = res.FAIL;
 				return true;
 			}
 		}
 		else
 		{
 			ROS_ERROR("[%s] Expected path type error !",__NAME__);
-			res.success = res.Fail;
+			res.success = res.FAIL;
 			return true;
 		}
 	}
@@ -287,36 +287,34 @@ bool AutoDrive::recordPathService(interface::RecordPath::Request  &req,
 	else if(req.command_type == req.RECORD_CURRENT_POINT)
 	{
 		//若当前非顶点型记录中,上位机逻辑错误
-		if(state_.get() != State_VertexPathRecording)
+		if(state_.get() != state_.State_VertexPathRecording)
 		{
 			ROS_ERROR("[%s] Request record current point, but system is not in vertex recording!",__NAME__);
-			res.success = res.Fail;
+			res.success = res.FAIL;
 			return true;
 		}
 
 		bool ok = recorder_.recordCurrentVertex(pose_);
 		if(!ok)
 		{
-			res.success = res.Fail;
+			res.success = res.FAIL;
 			return true;
 		}
 	}
 	//请求停止记录
 	else if(req.command_type == req.STOP_RECORD_PATH)
 	{
-		//当前已经处于空闲状态,但仍然需要返回成功标志,
-		//与请求记录时原理一致.
-		if(this->status_ == RecorderIdle)
+		if(!state_.isRecording())
 		{
-			res.success = Success;
+			res.success = res.FAIL;
 			return true;
 		}
 		ROS_INFO("[%s] Record path completed.",__NAME__);
 		recorder_.stopAndSave();
-		this->status_ = RecorderIdle;
+		state_.set(state_.State_SystemIdle);
 	}
 	
-	res.success = Success;
+	res.success = res.SUCCESS;
 	return true;
 }
 
