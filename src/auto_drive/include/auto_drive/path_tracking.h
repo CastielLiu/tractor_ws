@@ -9,6 +9,7 @@
 #include<std_msgs/Float32.h>
 #include<std_msgs/Float32.h>
 
+#include<nav_msgs/Path.h>
 #include<boost/thread.hpp>
 #include<std_msgs/UInt32.h>
 #include<std_msgs/UInt8.h>
@@ -37,9 +38,18 @@ public:
 
 private:
 	void publishInfo();
+	void pubGlobalPathTimerCallback(const ros::TimerEvent&)
+	{
+		publishGlobalPath(path_);
+	}
+	void publishGlobalPath(const path_t& path);
+
 private:
 	ros::NodeHandle nh_, nh_private_;
 	ros::Publisher pub_info_;
+	ros::Publisher pub_global_path_;
+	nav_msgs::Path global_path_;
+	ros::Timer pub_global_path_timer_;
 	
 	std::mutex path_mutex_;
 	path_t path_;

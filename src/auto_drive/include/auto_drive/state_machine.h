@@ -14,13 +14,13 @@ public:
     {
         State_SystemIdle = 0,
 
-        State_SuspendTracking = 1,
-        State_VertexTracking = 2,
-        State_CurveTracking = 3,
-        State_CompleteTracking = 4,
+        State_SuspendTrack = 1,    //暂停追踪
+        State_VertexTracking = 2,  //顶点型路径追踪中
+        State_CurveTracking = 3,   //连续型路径追踪中
+        State_CompleteTrack = 4,   //完成追踪
 
-        State_CurvePathRecording = 10,
-        State_VertexPathRecording = 11,
+        State_CurvePathRecording = 0xA,  //连续型路径记录中
+        State_VertexPathRecording = 0xB, //顶点型路径记录中
     };
 
     bool isRecording()
@@ -33,8 +33,8 @@ public:
 
     bool isTracking()
     {
-        if(state >= State_SuspendTracking && 
-           state <= State_CompleteTracking)
+        if(state >= State_SuspendTrack && 
+           state <= State_CompleteTrack)
             return true;
         return false;
     }

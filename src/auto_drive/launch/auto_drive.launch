@@ -3,33 +3,27 @@
     <arg name="host_pc_port" value="/dev/host_pc"/>
     <arg name="gps_port" value="/dev/gps"/>
     <arg name="steering_port" value="/dev/steer_motor"/>
-    
     <arg name="gps_topic" value="/gps_odom"/>
     <arg name="cmd_topic" value="/tractor_cmd"/>
-    <arg name="file_path" value="$(find record_path)/data/"/>
+    <arg name="is_debug" value="true"/>
     
+    <!-- interface -->
 	<node name="interface_node" pkg="interface" type="interface_node" output="screen">
 	    <param name="utm_topic" value="$(arg gps_topic)"/>
 		<param name="can2serial_port" value="$(arg host_pc_port)"/>
 		<param name="can_baudrate" value="250"/>
 	</node>
 	
+	<!-- auto_drive -->
 	<node name="auto_drive_node" pkg="auto_drive" type="auto_drive_node" output="screen">
 	    <param name="utm_topic" value="$(arg gps_topic)"/>  
-		<param name="path_file_dir" value="$(arg file_path)"/>
+		<param name="path_file_dir" value="$(find auto_drive)/data/"/>
 		<param name="foreSightDis_speedCoefficient" value="1.8"/>
 		<param name="foreSightDis_speedCoefficient" value="1.8"/>
 		<param name="min_foresight_distance" value="4.0"/>
 		<param name="wheel_base" value="2.0"/>
-		
 		<param name="cmd_topic" value="$(arg cmd_topic)"/>
-	</node>
-	
-	<!-- record_path -->
-	<node name="record_path_node" pkg="record_path" type="record_path_node" output="screen">
-	    <param name="utm_topic" value="$(arg gps_topic)" />
-		<param name="file_path" value="$(arg file_path)"/>
-		<param name="sample_distance" value="0.1"/>
+		<param name="is_debug" value="$(arg is_debug)"/>
 	</node>
 	
 	<!-- gps -->
@@ -45,6 +39,8 @@
 		<param name="road_wheel_angle_offset" value="-83.5"/>
 		<param name="road_wheel_angle_resolution" value="0.04"/> <!--1 adc 对应的角度值 -->
 		<param name="cmd_topic" value="$(arg cmd_topic)"/>
+		
+		<param name="is_debug" value="$(arg is_debug)"/>
 	</node>
 	
 </launch>

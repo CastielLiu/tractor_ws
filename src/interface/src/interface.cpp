@@ -120,6 +120,9 @@ void Interface::callServiceThread(const CanMsg_t& can_msg)
 		can_pkgs_.response.data[0] = 0x00;//response record path
 		can_pkgs_.response.data[1] = srv_record_path.response.success;
 		can2serial_->sendCanMsg(can_pkgs_.response); //response
+
+		can2serial_->showCanMsg(can_msg, "request record path");
+		can2serial_->showCanMsg(can_pkgs_.response, "response record path");
 	}
 	else if(can_msg.ID == DRIVERLESS_CAN_ID)
 	{
@@ -139,11 +142,14 @@ void Interface::callServiceThread(const CanMsg_t& can_msg)
 		ROS_INFO("[%s] Request auto drive:%s\t type:%d\t cmd:%d",__NAME__,
 							srv_driverless.request.path_file_name.c_str(),
 							srv_driverless.request.path_type,
-							srv_driverless.request.command_type);
+							srv_driverless.request.command_type);              
 		client_driverless_.call(srv_driverless);
 		can_pkgs_.response.data[0] = 0x01;//response driverless
 		can_pkgs_.response.data[1] = srv_driverless.response.success;
 		can2serial_->sendCanMsg(can_pkgs_.response); //response
+
+		can2serial_->showCanMsg(can_msg, "request diverless");
+		can2serial_->showCanMsg(can_pkgs_.response, "response diverless");
 	}
 	else if(can_msg.ID == RESET_CAN_ID)//系统复位
 	{

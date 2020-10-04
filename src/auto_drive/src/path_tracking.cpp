@@ -18,9 +18,31 @@ PathTracking::~PathTracking()
 {
 }
 
+void PathTracking::publishGlobalPath(const path_t& path)
+{
+	global_path_.header.frame_id = "gps";
+	global_path_.header.stamp = ros::Time::now();
+	global_path_.poses.reserve(path.size());
+
+	for(const gpsMsg_t point:path.points)
+	{
+		geometry_msgs::PoseStamped pose;
+
+        pose.pose.position.x = point.x;
+        pose.pose.position.y = point.y;
+
+        pose.header.stamp = global_path_.header.stamp;
+        pose.header.frame_id="gps";
+
+		global_path_.poses.push_back(pose);
+	}
+}
+
 bool PathTracking::init(const gpsMsg_t& vehicle_point)
 {
 	pub_info_ = nh_.advertise<driverless_msgs::PathTrackingInfo>("/tracking_info",1);
+	pub_global_path_ = nh_.advertise<nav_msgs::Path>("/global_path",1);
+	pub_global_path_timer_ = nh_.createTimer(ros::Duration(3.0), &PathTracking::pubGlobalPathTimerCallback, this);
 
 	nh_private_.param<float>("foreSightDis_speedCoefficient", foreSightDis_speedCoefficient_,1.8);
 	nh_private_.param<float>("foreSightDis_latErrCoefficient", foreSightDis_latErrCoefficient_,0.3);
@@ -30,13 +52,16 @@ bool PathTracking::init(const gpsMsg_t& vehicle_point)
 
 	if(path_.points.empty())
 	{
-		ROS_ERROR("[PathTracking]: please call setPath before init pathTracking!");
+		ROS_ERROR("[%s]: please call setPath before init pathTracking!", __NAME__);
 		return false;
 	}
 
 	nearest_point_index_ = findNearestPoint(path_, vehicle_point);
 	if(nearest_point_index_ <0)
+	{
+		ROS_ERROR("[%s] find nearest point failed.", __NAME__);
 		return false;
+	}
 
 	target_point_index_ = nearest_point_index_;
 	return true;
@@ -88,7 +113,6 @@ bool PathTracking::update(float speed, float road_wheelangle,  //vehicle state
 	vehicle_speed_ = speed;
 	road_wheelangle_ = road_wheelangle;
 
-	static int cnt = 0;
 	target_point_ = path_.points[target_point_index_];
 	
 	lateral_err_ = calculateDis2path(vehicle_point.x, vehicle_point.y, path_, nearest_point_index_, //input
@@ -126,6 +150,7 @@ bool PathTracking::update(float speed, float road_wheelangle,  //vehicle state
 	else
 		t_speed_ = 10.0;
 	
+	static int cnt = 0;
 	if(++cnt%20==0)
 	{
 		ROS_INFO("dis2target:%.2f\t yaw_err:%.2f\t lat_err:%.2f",dis_yaw.first,yaw_err*180.0/M_PI,lateral_err_);

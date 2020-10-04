@@ -223,8 +223,18 @@ float generateRoadwheelAngleByRadius(const float& radius, const float& wheel_bas
 	return atan(wheel_base/radius)*180/M_PI;    //correct algorithm 
 }
 
-bool loadPath(const std::string& file_path, path_t& path)
+/*@brief loadPath       载入路径文件
+ *@param file_path      文件路径
+ *@param path           路径点容器
+ *@param interpolation  路径点插值
+ *					    interpolation 为零时表示连续型路径，无需再插值
+ *                      interpolation 不为零时表示顶点型路径，需差值
+ */
+bool loadPath(const std::string& file_path, path_t& path, float interpolation)
 {
+	path.points.clear();
+	path.vertex.clear();
+
 	FILE *fp = fopen(file_path.c_str(),"r");
 	
 	if(fp==NULL)
@@ -232,46 +242,27 @@ bool loadPath(const std::string& file_path, path_t& path)
 		printf("[loadPath] open %s failed\r\n",file_path.c_str());
 		return false;
 	}
-	if(path.size() != 0)
-		path.clear();
 	
 	gpsMsg_t point;
 	while(!feof(fp))
 	{
 		fscanf(fp,"%lf\t%lf\t%lf\n",&point.x,&point.y,&point.yaw);
-		path.points.push_back(point);
+		if(resolution == 0.0)
+			path.points.push_back(point);
+		else
+			path.vertex.push_back(point);
 	}
-	path.resolution = 0.1; 
 	fclose(fp);
+
+	if(interpolation != 0.0)
+	{
+		path.resolution = interpolation; 
+		path.generatePointsByVertexes(interpolation);
+	}
+
 	if(path.size() < 2)
 		return false;
 	return true;
 }
 
-bool generatePathByVertexes(const path_t& vertex_path, path_t& path,float increment)
-{
-	const std::vector<gpsMsg_t>& vertexes = vertex_path.points;
-	if(vertexes.size()<2)
-		return false;
-	gpsMsg_t startPoint = vertexes[0];
-	gpsMsg_t endPoint;
-	for(int i=1; i<vertexes.size(); ++i)
-	{
-		endPoint = vertexes[i];
-		float distance = dis2Points(startPoint,endPoint,true);
-		int point_cnt = distance / increment;
-		
-		double x_increment = (endPoint.x - startPoint.x)/point_cnt;
-		double y_increment = (endPoint.y - startPoint.y)/point_cnt;
-		
-		for(int j=0; j<point_cnt; ++j)
-		{
-			gpsMsg_t now;
-			now.x = startPoint.x + x_increment*j;
-			now.y = startPoint.y + y_increment*j;
-			path.points.push_back(now);
-		}
-	}
-	return true;
-}
 

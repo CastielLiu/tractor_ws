@@ -37,20 +37,30 @@ bool AutoDrive::init()
 	sub_utm_ = nh_.subscribe(utm_topic, 1,&AutoDrive::odom_callback,this);
 	sub_state_ = nh_.subscribe("/base_control_state", 1, &AutoDrive::base_ctrl_state_callback, this);
 
+
+    std::string cmd_topic = nh_private_.param<std::string>("cmd_topic","/cmd");
+    pub_cmd_ = nh_.advertise<driverless_msgs::ControlCmd>(cmd_topic, 1);
+	pub_state_ = nh_.advertise<std_msgs::UInt8>("/system_state", 1); //发布系统状态
+
+	update_timer_ = nh_.createTimer(ros::Duration(0.05),&AutoDrive::update_timer_callback,this); //控制指令发布定时器
+
+    srv_driverless_ = nh_.advertiseService("driverless_service", &AutoDrive::driverlessService, this);
+	srv_recorder_   = nh_.advertiseService("record_path_service",&AutoDrive::recordPathService, this);
+	if(!recorder_.init()) return false;
+
+	if(nh_private_.param<bool>("is_debug", false)) //debug mode
+	{
+		ROS_INFO("[%s] debug mode, not init steering motor.", __NAME__);
+		return true;
+	}
+
 	// wait for system ok
 	while(ros::ok() && !is_gps_data_valid(pose_))
 	{
 		ROS_INFO("[AutoDrive]: gps data is invalid, please check the gps topic or waiting...");
 		ros::Duration(0.5).sleep();
 	}
-    std::string cmd_topic = nh_private_.param<std::string>("cmd_topic","/cmd");
-    pub_cmd_ = nh_.advertise<driverless_msgs::ControlCmd>(cmd_topic, 1);
-	pub_state_ = nh_.advertise<std_msgs::UInt8>("/system_state", 1); //发布系统状态
-
-	update_timer_ = nh_.createTimer(ros::Duration(0.05),&AutoDrive::update_timer_callback,this);
-
-    srv_driverless_ = nh_.advertiseService("driverless_service", &AutoDrive::driverlessService, this);
-	srv_recorder_   = nh_.advertiseService("record_path_service",&AutoDrive::recordPathService, this);
+	return true;
 }
 
 bool AutoDrive::driverlessService(interface::Driverless::Request  &req,
@@ -74,11 +84,13 @@ bool AutoDrive::driverlessService(interface::Driverless::Request  &req,
 		{
 			if(--max_try_num ==0) //超出最大等待时长
 			{
+				ROS_ERROR("[%s] Another task is running now, please waiting...", __NAME__);
 				res.success = res.FAIL;
 				return true;
 			}
-			ros::Duration(0.2).sleep();
+			ros::Duration(0.1).sleep();
 		}
+		auto_drive_thread_mutex_.unlock(); //此处一定不能忘记解锁
 
 		fs::path file = fs::path(path_file_dir_)/req.path_file_name;
 		if(!fs::exists(file))
@@ -91,11 +103,11 @@ bool AutoDrive::driverlessService(interface::Driverless::Request  &req,
 		if(req.path_type == req.CURVE_TYPE) //连续型路径
 		{
 			state_.set(state_.State_CurveTracking); //状态置为连续型跟踪中
-			path_.clear();
-			
+
 			//载入路径文件，并配置路径跟踪控制器
 			if(!loadPath(file_name, path_) || !this->tracker_.setPath(path_))
 			{
+				ROS_ERROR("[%s] PATH_FILE_ERROR", __NAME__);
 				res.success = res.PATH_FILE_ERROR;
 				state_.set(state_.State_SystemIdle);
 				return true;
@@ -105,9 +117,9 @@ bool AutoDrive::driverlessService(interface::Driverless::Request  &req,
 		else if(req.path_type == req.VERTEX_TYPE)
 		{
 			state_.set(state_.State_VertexTracking);
-			path_t vertex_path;
-			if(!loadPath(file_name,vertex_path) || !generatePathByVertexes(vertex_path, path_, 0.1))
+			if(!loadPath(file_name,path_, 0.1))
 			{
+				ROS_ERROR("[%s] PATH_FILE_ERROR", __NAME__);
 				res.success = res.PATH_FILE_ERROR;
 				state_.set(state_.State_SystemIdle);
 				return true;
@@ -116,6 +128,7 @@ bool AutoDrive::driverlessService(interface::Driverless::Request  &req,
 		}
 		else
 		{
+			ROS_ERROR("[%s] Unknown path type", __NAME__);
 			res.success = res.FAIL;
 			state_.set(state_.State_SystemIdle);
 			return true;
@@ -125,33 +138,38 @@ bool AutoDrive::driverlessService(interface::Driverless::Request  &req,
 		tracker_.setPath(path_);
 		if(!tracker_.init(pose_))
 		{
+			ROS_ERROR("[%s] init tracker failed.", __NAME__);
 			res.success = res.FAIL;
 			state_.set(state_.State_SystemIdle);
 			return true;
 		}
+		ROS_INFO("[%s] init tracker complete.", __NAME__);
 
 		#if USE_AVOIDANCE
 		//初始化避障控制器
 		avoider_.setPath(path_);
 		if(!avoider_.init())
 		{
+			ROS_ERROR("[%s] init avoider failed.", __NAME__);
 			res.success = res.FAIL;
 			state_.set(state_.State_SystemIdle);
 			return true;
 		}
+		ROS_INFO("[%s] init avoider complete.", __NAME__);
 		#endif
 
 		auto_drive_thread_ptr_ = 
             std::shared_ptr<std::thread >(new std::thread(std::bind(&AutoDrive::autoDriveThread, this,req.speed)));
 	}
 	else if(req.command_type == req.STOP)     //请求停止，状态置为完成
-		state_.set(state_.State_CompleteTracking);
+		state_.set(state_.State_CompleteTrack);
 	else if(req.command_type == req.SUSPEND)  //请求暂停
-		state_.set(state_.State_SuspendTracking);
+		state_.set(state_.State_SuspendTrack);
 	else if(req.command_type == req.CONFIRM_STOP) //确认停止，状态置为空闲，释放制动
 		state_.set(state_.State_SystemIdle);
 	else
 	{
+		ROS_ERROR("[%s] Unknown command type", __NAME__);
 		res.success = res.FAIL;
 		return true;
 	}
@@ -171,13 +189,13 @@ void AutoDrive::autoDriveThread(float speed)
 	
 	while(ros::ok())
 	{
-		if(state_.get() == state_.State_SuspendTracking)
+		if(state_.get() == state_.State_SuspendTrack)
 		{
 			loop_rate.sleep();
 			continue;
 		}
 
-		if((state_.get() == state_.State_CompleteTracking) || 
+		if((state_.get() == state_.State_CompleteTrack) || 
 		   (state_.get() == state_.State_SystemIdle))
 			break;
 		
@@ -188,7 +206,7 @@ void AutoDrive::autoDriveThread(float speed)
         if(!update_state) //更新失败,抵达目标地或出现异常
         {
 			//此处状态为跟踪完成，待上位机确认后置为空闲
-			state_.set(state_.State_CompleteTracking);
+			state_.set(state_.State_CompleteTrack);
 			ROS_INFO("[%s] reach the destination.", __NAME__);
 			break;
 		}
@@ -212,8 +230,8 @@ void AutoDrive::update_timer_callback(const ros::TimerEvent&)
 		cmd_.driverless_mode = true;
 		cmd_.set_brake = 0;
 	}
-	else if(state_.get()==state_.State_CompleteTracking ||
-			state_.get()==state_.State_SuspendTracking)
+	else if(state_.get()==state_.State_CompleteTrack ||
+			state_.get()==state_.State_SuspendTrack)
 	{
 		cmd_.driverless_mode = true;
 		cmd_.set_brake = 5;
@@ -227,7 +245,7 @@ void AutoDrive::update_timer_callback(const ros::TimerEvent&)
 	pub_cmd_.publish(cmd_);
 
 	std_msgs::UInt8 state;
-	state.data = state_.get();
+	state.data = this->state_.get();
 	pub_state_.publish(state);
 }
 
@@ -304,9 +322,10 @@ bool AutoDrive::recordPathService(interface::RecordPath::Request  &req,
 	//请求停止记录
 	else if(req.command_type == req.STOP_RECORD_PATH)
 	{
-		if(!state_.isRecording())
+		if(!state_.isRecording()) //未处于记录状态
 		{
-			res.success = res.FAIL;
+			recorder_.stopWithoutSave();
+			res.success = res.SUCCESS;
 			return true;
 		}
 		ROS_INFO("[%s] Record path completed.",__NAME__);
@@ -314,6 +333,7 @@ bool AutoDrive::recordPathService(interface::RecordPath::Request  &req,
 		state_.set(state_.State_SystemIdle);
 	}
 	
+	ROS_INFO("[%s] request complete.", __NAME__);
 	res.success = res.SUCCESS;
 	return true;
 }
@@ -338,6 +358,7 @@ void AutoDrive::base_ctrl_state_callback(const driverless_msgs::BaseControlState
 //作为回调函数为调用方提供信息
 const gpsMsg_t AutoDrive::currentPose()
 {
+	ROS_INFO("const gpsMsg_t AutoDrive::currentPose()_");
 	read_lock_t read_lock(pose_wr_mutex_);
 	return pose_;
 }

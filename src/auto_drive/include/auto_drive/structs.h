@@ -23,6 +23,7 @@ typedef struct
 
 typedef struct
 {
+	std::vector<gpsMsg_t> vertexes;
 	std::vector<gpsMsg_t> points;
 	float resolution; //分辨率,即路径点间的间距
 	void clear()
@@ -38,6 +39,41 @@ typedef struct
 	const gpsMsg_t& operator[](size_t i) const
 	{
 		return points[i];
+	}
+
+	enum PathType
+	{
+		PathType_Vertex,
+		PathType_Curve,
+	};
+	uint8_t type;
+
+	bool generatePointsByVertexes(float increment)
+	{
+		if(vertexes.size()<2)
+			return false;
+		gpsMsg_t startPoint = vertexes[0];
+		gpsMsg_t endPoint;
+		for(int i=1; i<vertexes.size(); ++i)
+		{
+			endPoint = vertexes[i];
+			float distance = dis2Points(startPoint,endPoint,true);
+			int point_cnt = distance / increment;
+			
+			double x_increment = (endPoint.x - startPoint.x)/point_cnt;
+			double y_increment = (endPoint.y - startPoint.y)/point_cnt;
+			
+			for(int j=0; j<point_cnt; ++j)
+			{
+				gpsMsg_t now;
+				now.x = startPoint.x + x_increment*j;
+				now.y = startPoint.y + y_increment*j;
+				points.push_back(now);
+			}
+		}
+		if(points.size()==0)
+			return false;
+		return true;
 	}
 
 }path_t;

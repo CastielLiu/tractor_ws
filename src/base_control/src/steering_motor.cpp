@@ -393,19 +393,19 @@ void SteerMotor::stopRequestState()
 
 float SteerMotor::getRoadWheelAngle() const
 {
-	assert(is_request_state_);
+	//assert(is_request_state_);
 	return road_wheel_angle_;
 }
 
 float SteerMotor::getMotorSpeed() const
 {
-	assert(is_request_state_);
+	//assert(is_request_state_);
 	return motor_speed_;
 }
 
 uint8_t SteerMotor::getErrorMsg() const 
 {
-	assert(is_request_state_);
+	//assert(is_request_state_);
 	uint64_t now = std::chrono::duration_cast<std::chrono::milliseconds>
 		(std::chrono::system_clock::now().time_since_epoch()).count();
 	if(now - last_active_time_ms_ > 200)

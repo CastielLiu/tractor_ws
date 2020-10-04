@@ -11,7 +11,7 @@ enum
     DRIVERLESS_CAN_ID = 0x201,   //请求自动驾驶
     RESPONSE_CAN_ID = 0x205,     //应答报文
     RESET_CAN_ID = 0x203,        //系统复位(清除转向电机错误代码)
-    HEARTBEAT_CAN_ID = 0x24,     //心跳包
+    HEARTBEAT_CAN_ID = 0x204,     //心跳包
 };
 
 typedef struct CanMsgs

@@ -77,6 +77,12 @@ bool BaseControl::init()
 	steerMotor_.setRoadWheelAngleOffset(road_wheel_angle_offset);
 	steerMotor_.setRoadWheelAngleResolution(road_wheel_angle_resolution);
 
+	if(nh_private.param<bool>("is_debug", false)) //debug mode
+	{
+		ROS_INFO("[%s] debug mode, not init steering motor.", __NAME__);
+		return true;
+	}
+
 	if(!steerMotor_.init(steerMotor_port_name_,115200))
 	{
 	    ROS_ERROR("[%s] init steering motor failed.", __NAME__);
@@ -140,7 +146,7 @@ int main(int argc, char** argv)
 {
 	ros::init(argc,argv,"base_control_node");
 	BaseControl base_control;
-	base_control.init();
-	ros::spin();
+	if(base_control.init())
+		ros::spin();
 	return 0;
 }

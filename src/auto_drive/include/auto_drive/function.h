@@ -31,8 +31,6 @@ gpsMsg_t pointOffset(const gpsMsg_t& point,float offset);
 
 float generateRoadwheelAngleByRadius(const float& radius, const float& wheel_base);
 
-bool loadPath(const std::string& file_path, path_t& path);
-
-bool generatePathByVertexes(const path_t& vertex_path, path_t& path,float increment);
+bool loadPath(const std::string& file_path, path_t& path， float interpolation=0.0);
 
 #endif
