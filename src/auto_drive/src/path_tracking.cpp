@@ -20,30 +20,40 @@ PathTracking::~PathTracking()
 
 void PathTracking::publishGlobalPath(const path_t& path)
 {
-	global_path_.header.frame_id = "gps";
-	global_path_.header.stamp = ros::Time::now();
-	global_path_.poses.reserve(path.size());
+	if(path.size() == 0)
+		return;
 
-	for(const gpsMsg_t point:path.points)
+	global_path_.header.frame_id = "world";
+	global_path_.header.stamp = ros::Time::now();
+
+	if(!is_new_task_)
+	{
+		pub_global_path_.publish(global_path_);
+		return;
+	}
+	is_new_task_ = false;
+	const std::vector<gpsMsg_t> * points_ptr;
+
+	if(path.type == path.PathType_Curve)
+		points_ptr = &path.points;
+	else
+		points_ptr = &path.vertexes;
+
+	global_path_.poses.reserve(points_ptr->size());
+	for(const gpsMsg_t point:(*points_ptr))
 	{
 		geometry_msgs::PoseStamped pose;
-
-        pose.pose.position.x = point.x;
-        pose.pose.position.y = point.y;
-
-        pose.header.stamp = global_path_.header.stamp;
-        pose.header.frame_id="gps";
-
+		pose.pose.position.x = point.x;
+		pose.pose.position.y = point.y;
+		pose.header.stamp = global_path_.header.stamp;
+		pose.header.frame_id="world";
 		global_path_.poses.push_back(pose);
 	}
+	pub_global_path_.publish(global_path_);
 }
 
 bool PathTracking::init(const gpsMsg_t& vehicle_point)
 {
-	pub_info_ = nh_.advertise<driverless_msgs::PathTrackingInfo>("/tracking_info",1);
-	pub_global_path_ = nh_.advertise<nav_msgs::Path>("/global_path",1);
-	pub_global_path_timer_ = nh_.createTimer(ros::Duration(3.0), &PathTracking::pubGlobalPathTimerCallback, this);
-
 	nh_private_.param<float>("foreSightDis_speedCoefficient", foreSightDis_speedCoefficient_,1.8);
 	nh_private_.param<float>("foreSightDis_latErrCoefficient", foreSightDis_latErrCoefficient_,0.3);
 	
@@ -56,12 +66,19 @@ bool PathTracking::init(const gpsMsg_t& vehicle_point)
 		return false;
 	}
 
-	nearest_point_index_ = findNearestPoint(path_, vehicle_point);
-	if(nearest_point_index_ <0)
+	std::pair<size_t, float> nearestPoint = findNearestPoint(path_, vehicle_point);
+	nearest_point_index_ = nearestPoint.first;
+	float dis2nearest_point = nearestPoint.second;
+
+	if(dis2nearest_point > 10.0)
 	{
-		ROS_ERROR("[%s] find nearest point failed.", __NAME__);
+		ROS_ERROR("[%s] find nearest point failed. current pose is too far (%.2fm) from the given path!", __NAME__,dis2nearest_point);
 		return false;
 	}
+
+	pub_info_ = nh_.advertise<driverless_msgs::PathTrackingInfo>("/tracking_info",1);
+	pub_global_path_ = nh_.advertise<nav_msgs::Path>("/global_path",1);
+	pub_global_path_timer_ = nh_.createTimer(ros::Duration(3.0), &PathTracking::pubGlobalPathTimerCallback, this);
 
 	target_point_index_ = nearest_point_index_;
 	return true;
@@ -164,6 +181,7 @@ bool PathTracking::update(float speed, float road_wheelangle,  //vehicle state
 bool PathTracking::setPath(const path_t& path)
 {
 	path_mutex_.lock();
+	is_new_task_ = true;
     path_ = path;
 	//终点索引为拓展前路径的最后一个点
 	destination_index_ = path_.size()-1;

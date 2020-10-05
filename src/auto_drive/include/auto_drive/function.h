@@ -25,12 +25,12 @@ float dis2Points(const gpsMsg_t& point1, const gpsMsg_t& point2,bool is_sqrt=tru
 
 std::pair<float, float> get_dis_yaw(const gpsMsg_t &point1, const gpsMsg_t &point2);
 
-int findNearestPoint(const path_t& path, const gpsMsg_t& current_point);
+std::pair<size_t,float>  findNearestPoint(const path_t& path, const gpsMsg_t& current_point);
 
 gpsMsg_t pointOffset(const gpsMsg_t& point,float offset);
 
 float generateRoadwheelAngleByRadius(const float& radius, const float& wheel_base);
 
-bool loadPath(const std::string& file_path, path_t& path， float interpolation=0.0);
+bool loadPath(const std::string& file_path, path_t& path, float interpolation=0.0);
 
 #endif

@@ -179,7 +179,12 @@ std::pair<float, float> get_dis_yaw(const gpsMsg_t &point1, const gpsMsg_t &poin
 	return dis_yaw;
 }
 
-int findNearestPoint(const path_t& path, const gpsMsg_t& current_point)
+/*@brief findNearestPoint 在路径中查找距离当前位置最近的路径点
+ *@param path             路径
+ *@param current_point    当前位置
+ *@return 最近点索引，距离
+*/
+std::pair<size_t,float> findNearestPoint(const path_t& path, const gpsMsg_t& current_point)
 {
 	int index = 0;
 	float min_dis = FLT_MAX;
@@ -199,13 +204,7 @@ int findNearestPoint(const path_t& path, const gpsMsg_t& current_point)
 		i += int(dis)+1;
 	}
 	
-	if(min_dis >10.0)
-	{
-		index = -1;
-		printf("the nearest point is so far! that's to say, the vehicle is far from the reference path!");
-	}
-	
-	return index;
+	return std::make_pair(index,min_dis);
 }
 
 gpsMsg_t pointOffset(const gpsMsg_t& point,float offset)
@@ -233,7 +232,7 @@ float generateRoadwheelAngleByRadius(const float& radius, const float& wheel_bas
 bool loadPath(const std::string& file_path, path_t& path, float interpolation)
 {
 	path.points.clear();
-	path.vertex.clear();
+	path.vertexes.clear();
 
 	FILE *fp = fopen(file_path.c_str(),"r");
 	
@@ -247,16 +246,19 @@ bool loadPath(const std::string& file_path, path_t& path, float interpolation)
 	while(!feof(fp))
 	{
 		fscanf(fp,"%lf\t%lf\t%lf\n",&point.x,&point.y,&point.yaw);
-		if(resolution == 0.0)
+		if(interpolation == 0.0)
 			path.points.push_back(point);
 		else
-			path.vertex.push_back(point);
+			path.vertexes.push_back(point);
 	}
 	fclose(fp);
 
-	if(interpolation != 0.0)
+	if(interpolation == 0.0)
+		path.type = path.PathType_Curve;
+	else
 	{
 		path.resolution = interpolation; 
+		path.type = path.PathType_Vertex;
 		path.generatePointsByVertexes(interpolation);
 	}
 

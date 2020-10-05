@@ -29,9 +29,14 @@
 	<!-- gps -->
 	<node name="nuogeng_node" pkg="nuogeng" type="nuogeng_node" output="screen">
 		<param name="port_name" value="$(arg gps_port)"/>
-		<param name="is_ll2utm" value="true"/>
 		<param name="odom_topic" value="$(arg gps_topic)"/>
+		<param name="parent_frame_id" value="world"/>
+		<param name="child_frame_id" value="gps_base"/>
+		<param name="pub_odom" value="true"/>
+		<param name="pub_tf" value="true"/>
 	</node>
+
+	<!-- node name="base_gps_tf" pkg="tf" type="static_transform_publisher" args="0 0 0 0 0 0 base_link gps 50"/-->
 	
 	<!--base_control-->
 	<node name="base_control_node" pkg="base_control" type="base_control_node" required="true" output="screen">
@@ -42,5 +47,7 @@
 		
 		<param name="is_debug" value="$(arg is_debug)"/>
 	</node>
+
+	<node name="rviz" pkg="rviz" type="rviz" args="-d $(find auto_drive)/rviz/auto_drive.rviz"/>
 	
 </launch>

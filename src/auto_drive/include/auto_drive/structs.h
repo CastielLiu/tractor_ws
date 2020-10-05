@@ -57,7 +57,9 @@ typedef struct
 		for(int i=1; i<vertexes.size(); ++i)
 		{
 			endPoint = vertexes[i];
-			float distance = dis2Points(startPoint,endPoint,true);
+			float delta_x = startPoint.x-endPoint.x;
+			float delta_y = startPoint.y-endPoint.y;
+			float distance = sqrt(delta_x*delta_x + delta_y*delta_y);
 			int point_cnt = distance / increment;
 			
 			double x_increment = (endPoint.x - startPoint.x)/point_cnt;

@@ -63,7 +63,6 @@ private:
     ros::ServiceServer srv_recorder_;
     ros::NodeHandle nh_, nh_private_;
 
-    std::shared_ptr<std::thread> auto_drive_thread_ptr_;
     std::mutex auto_drive_thread_mutex_;
 
     driverless_msgs::ControlCmd cmd_;

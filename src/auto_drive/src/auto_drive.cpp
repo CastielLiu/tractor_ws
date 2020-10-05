@@ -66,9 +66,8 @@ bool AutoDrive::init()
 bool AutoDrive::driverlessService(interface::Driverless::Request  &req,
 								  interface::Driverless::Response &res)
 {
-	//正在记录路径，无法启动自动驾驶
-	//上位机逻辑正确的情况下不会出现这种情况
-	if(state_.isRecording()) 
+	if(state_.isBusy() ||    //系统正忙
+	   state_.isRecording()) //正在记录路径，无法启动自动驾驶 上位机逻辑正确的情况下不会出现这种情况
 	{
 		res.success = res.FAIL;
 		return true;
@@ -77,13 +76,14 @@ bool AutoDrive::driverlessService(interface::Driverless::Request  &req,
 	//请求开始自动驾驶，首先中断当前已有的自动驾驶任务
 	if(req.command_type == req.START)
 	{
-		state_.set(state_.State_SystemIdle); //将状态置为空闲，促使正在执行的自动驾驶退出(如果有)
+		state_.set(state_.State_SystemBusy); //将状态置为忙，正在执行的自动驾驶将自动退出
 		ros::Duration(0.5).sleep();   //等待正在自动驾驶的线程退出(如果有)
 		int max_try_num = 5;
 		while(!auto_drive_thread_mutex_.try_lock()) //尝试加锁, 失败:表明自动驾驶线程正在运行
 		{
 			if(--max_try_num ==0) //超出最大等待时长
 			{
+				state_.set(state_.State_SystemIdle);
 				ROS_ERROR("[%s] Another task is running now, please waiting...", __NAME__);
 				res.success = res.FAIL;
 				return true;
@@ -95,6 +95,7 @@ bool AutoDrive::driverlessService(interface::Driverless::Request  &req,
 		fs::path file = fs::path(path_file_dir_)/req.path_file_name;
 		if(!fs::exists(file))
 		{
+			state_.set(state_.State_SystemIdle);
 		    ROS_ERROR("[%s] %s FileNotExist.",__NAME__,fs::system_complete(file).string().c_str());
 			res.success = res.PATH_FILE_NOT_EXIST;
 			return true;
@@ -102,29 +103,24 @@ bool AutoDrive::driverlessService(interface::Driverless::Request  &req,
 		std::string file_name = fs::system_complete(file).string();
 		if(req.path_type == req.CURVE_TYPE) //连续型路径
 		{
-			state_.set(state_.State_CurveTracking); //状态置为连续型跟踪中
-
 			//载入路径文件，并配置路径跟踪控制器
 			if(!loadPath(file_name, path_) || !this->tracker_.setPath(path_))
 			{
+				state_.set(state_.State_SystemIdle);
 				ROS_ERROR("[%s] PATH_FILE_ERROR", __NAME__);
 				res.success = res.PATH_FILE_ERROR;
-				state_.set(state_.State_SystemIdle);
 				return true;
 			}
-			ROS_INFO("[%s] Curve tracking path points size: %lu",__NAME__, path_.points.size());
 		}
 		else if(req.path_type == req.VERTEX_TYPE)
 		{
-			state_.set(state_.State_VertexTracking);
 			if(!loadPath(file_name,path_, 0.1))
 			{
+				state_.set(state_.State_SystemIdle);
 				ROS_ERROR("[%s] PATH_FILE_ERROR", __NAME__);
 				res.success = res.PATH_FILE_ERROR;
-				state_.set(state_.State_SystemIdle);
 				return true;
 			}
-			ROS_INFO("[%s] Vertex tracking path points size:%lu",__NAME__, path_.points.size());
 		}
 		else
 		{
@@ -158,8 +154,18 @@ bool AutoDrive::driverlessService(interface::Driverless::Request  &req,
 		ROS_INFO("[%s] init avoider complete.", __NAME__);
 		#endif
 
-		auto_drive_thread_ptr_ = 
-            std::shared_ptr<std::thread >(new std::thread(std::bind(&AutoDrive::autoDriveThread, this,req.speed)));
+		if(req.path_type == req.VERTEX_TYPE)
+		{
+			state_.set(state_.State_VertexTracking);
+			ROS_INFO("[%s] Vertex tracking path points size:%lu",__NAME__, path_.points.size());
+		}
+		else if(req.path_type == req.CURVE_TYPE)
+		{
+			state_.set(state_.State_CurveTracking); //状态置为连续型跟踪中
+			ROS_INFO("[%s] Curve tracking path points size: %lu",__NAME__, path_.points.size());
+		}
+		std::thread t(std::bind(&AutoDrive::autoDriveThread, this,req.speed));
+		t.detach();
 	}
 	else if(req.command_type == req.STOP)     //请求停止，状态置为完成
 		state_.set(state_.State_CompleteTrack);
@@ -187,17 +193,13 @@ void AutoDrive::autoDriveThread(float speed)
 	
 	ros::Rate loop_rate(20);
 	
-	while(ros::ok())
+	while(ros::ok() && state_.isTracking())
 	{
 		if(state_.get() == state_.State_SuspendTrack)
 		{
 			loop_rate.sleep();
 			continue;
 		}
-
-		if((state_.get() == state_.State_CompleteTrack) || 
-		   (state_.get() == state_.State_SystemIdle))
-			break;
 		
 		pose_wr_mutex_.lock_shared();
 		bool update_state = tracker_.update(vehicle_speed_, roadwheel_angle_, pose_, avoid_offset_);
@@ -215,7 +217,7 @@ void AutoDrive::autoDriveThread(float speed)
 		loop_rate.sleep();
 	} //自动驾驶完成
 	
-	ROS_INFO("[%s] automatic drive completed...",__NAME__); //send msg to screen 
+	ROS_INFO("[%s] auto drive completed...",__NAME__); 
 
 #if USE_AVOIDANCE
 	avoider_.shutDown();
@@ -252,9 +254,8 @@ void AutoDrive::update_timer_callback(const ros::TimerEvent&)
 bool AutoDrive::recordPathService(interface::RecordPath::Request  &req,
 						   		  interface::RecordPath::Response &res)
 {
-	//正在路径跟踪，禁用路径记录
-	//上位机逻辑正确的情况下不会出现这种情况
-	if(state_.isTracking()) 
+	if(   state_.isBusy()      //系统正忙, 防止指令重复请求
+	   || state_.isTracking()) //正在路径跟踪 上位机逻辑正确的情况下不会出现这种情况
 	{
 		res.success = res.FAIL;
 		return true;
@@ -263,20 +264,19 @@ bool AutoDrive::recordPathService(interface::RecordPath::Request  &req,
 	if(req.command_type == req.START_RECORD_PATH ) //请求开始记录
 	{
 		if(state_.isRecording()) //正在记录
-		{
 			recorder_.stopWithoutSave(); //强制终止当前记录
-			state_.set(state_.State_SystemIdle);
-		}
+
+		state_.set(state_.State_SystemBusy);
 
 		if(req.path_type ==req.CURVE_TYPE) //记录连续型路径
 		{
 			ROS_INFO("[%s] Request start record path: curve type.",__NAME__);
-			state_.set(state_.State_CurvePathRecording);
-
+		
 			//开始连续型路径记录，传入文件名、位置获取函数
 			bool ok = recorder_.startCurvePathRecord(req.path_file_name, &AutoDrive::currentPose, this);
 			if(!ok)
 			{
+				state_.set(state_.State_CurvePathRecording);
 				res.success = res.FAIL;
 				return true;
 			}
@@ -284,18 +284,19 @@ bool AutoDrive::recordPathService(interface::RecordPath::Request  &req,
 		else if(req.path_type == req.VERTEX_TYPE) //顶点型路径记录
 		{
 			ROS_INFO("[%s] Request start record path: vertex type.",__NAME__);
-			state_.set(state_.State_VertexPathRecording);
 
 			//开始顶点型路径记录
 			bool ok = recorder_.startVertexPathRecord(req.path_file_name);
 			if(!ok)
 			{
+				state_.set(state_.State_VertexPathRecording);
 				res.success = res.FAIL;
 				return true;
 			}
 		}
 		else
 		{
+			state_.set(state_.State_SystemIdle);
 			ROS_ERROR("[%s] Expected path type error !",__NAME__);
 			res.success = res.FAIL;
 			return true;

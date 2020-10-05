@@ -76,7 +76,7 @@ private:
 	float wheel_base_;
 	bool is_running_;
 	size_t destination_index_;
-	
+	bool is_new_task_;
 };
 
 

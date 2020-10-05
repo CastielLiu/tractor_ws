@@ -19,9 +19,16 @@ public:
         State_CurveTracking = 3,   //连续型路径追踪中
         State_CompleteTrack = 4,   //完成追踪
 
+        State_SystemBusy = 6,      //系统忙，正在处理请求指令
+
         State_CurvePathRecording = 0xA,  //连续型路径记录中
         State_VertexPathRecording = 0xB, //顶点型路径记录中
     };
+
+    bool isBusy()
+    {
+        return (state == State_SystemBusy);
+    }
 
     bool isRecording()
     {
@@ -34,7 +41,7 @@ public:
     bool isTracking()
     {
         if(state >= State_SuspendTrack && 
-           state <= State_CompleteTrack)
+           state <= State_CurveTracking)
             return true;
         return false;
     }
