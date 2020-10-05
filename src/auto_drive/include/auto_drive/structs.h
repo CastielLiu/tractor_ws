@@ -29,6 +29,7 @@ typedef struct
 	void clear()
 	{
 		points.clear();
+		vertexes.clear();
 	}
 	size_t size() const
 	{
@@ -52,11 +53,11 @@ typedef struct
 	{
 		if(vertexes.size()<2)
 			return false;
-		gpsMsg_t startPoint = vertexes[0];
-		gpsMsg_t endPoint;
+		
 		for(int i=1; i<vertexes.size(); ++i)
 		{
-			endPoint = vertexes[i];
+			gpsMsg_t startPoint = vertexes[i-1];
+			gpsMsg_t endPoint = vertexes[i];
 			float delta_x = startPoint.x-endPoint.x;
 			float delta_y = startPoint.y-endPoint.y;
 			float distance = sqrt(delta_x*delta_x + delta_y*delta_y);

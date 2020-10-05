@@ -5,7 +5,6 @@
     <arg name="steering_port" value="/dev/steer_motor"/>
     <arg name="gps_topic" value="/gps_odom"/>
     <arg name="cmd_topic" value="/tractor_cmd"/>
-    <arg name="is_debug" value="true"/>
     
     <!-- interface -->
 	<node name="interface_node" pkg="interface" type="interface_node" output="screen">
@@ -23,7 +22,7 @@
 		<param name="min_foresight_distance" value="4.0"/>
 		<param name="wheel_base" value="2.0"/>
 		<param name="cmd_topic" value="$(arg cmd_topic)"/>
-		<param name="is_debug" value="$(arg is_debug)"/>
+		<param name="is_debug" value="false"/>
 	</node>
 	
 	<!-- gps -->
@@ -31,7 +30,7 @@
 		<param name="port_name" value="$(arg gps_port)"/>
 		<param name="odom_topic" value="$(arg gps_topic)"/>
 		<param name="parent_frame_id" value="world"/>
-		<param name="child_frame_id" value="gps_base"/>
+		<param name="child_frame_id" value="gps"/>
 		<param name="pub_odom" value="true"/>
 		<param name="pub_tf" value="true"/>
 	</node>
@@ -45,7 +44,7 @@
 		<param name="road_wheel_angle_resolution" value="0.04"/> <!--1 adc 对应的角度值 -->
 		<param name="cmd_topic" value="$(arg cmd_topic)"/>
 		
-		<param name="is_debug" value="$(arg is_debug)"/>
+		<param name="is_debug" value="true"/>
 	</node>
 
 	<node name="rviz" pkg="rviz" type="rviz" args="-d $(find auto_drive)/rviz/auto_drive.rviz"/>

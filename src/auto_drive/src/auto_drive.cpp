@@ -276,10 +276,11 @@ bool AutoDrive::recordPathService(interface::RecordPath::Request  &req,
 			bool ok = recorder_.startCurvePathRecord(req.path_file_name, &AutoDrive::currentPose, this);
 			if(!ok)
 			{
-				state_.set(state_.State_CurvePathRecording);
+				state_.set(state_.State_SystemIdle);
 				res.success = res.FAIL;
 				return true;
 			}
+			state_.set(state_.State_CurvePathRecording);
 		}
 		else if(req.path_type == req.VERTEX_TYPE) //顶点型路径记录
 		{
@@ -289,10 +290,11 @@ bool AutoDrive::recordPathService(interface::RecordPath::Request  &req,
 			bool ok = recorder_.startVertexPathRecord(req.path_file_name);
 			if(!ok)
 			{
-				state_.set(state_.State_VertexPathRecording);
+				state_.set(state_.State_SystemIdle);
 				res.success = res.FAIL;
 				return true;
 			}
+			state_.set(state_.State_VertexPathRecording);
 		}
 		else
 		{
@@ -341,6 +343,7 @@ bool AutoDrive::recordPathService(interface::RecordPath::Request  &req,
 
 void AutoDrive::odom_callback(const nav_msgs::Odometry::ConstPtr& msg)
 {
+	
 	write_lock_t write_lock(pose_wr_mutex_);
 	pose_.x = msg->pose.pose.position.x;
 	pose_.y = msg->pose.pose.position.y;
@@ -359,7 +362,7 @@ void AutoDrive::base_ctrl_state_callback(const driverless_msgs::BaseControlState
 //作为回调函数为调用方提供信息
 const gpsMsg_t AutoDrive::currentPose()
 {
-	ROS_INFO("const gpsMsg_t AutoDrive::currentPose()_");
+	//ROS_INFO("const gpsMsg_t AutoDrive::currentPose()_");
 	read_lock_t read_lock(pose_wr_mutex_);
 	return pose_;
 }

@@ -38,7 +38,8 @@ void PathTracking::publishGlobalPath(const path_t& path)
 		points_ptr = &path.points;
 	else
 		points_ptr = &path.vertexes;
-
+	
+	global_path_.poses.clear();
 	global_path_.poses.reserve(points_ptr->size());
 	for(const gpsMsg_t point:(*points_ptr))
 	{
@@ -170,6 +171,8 @@ bool PathTracking::update(float speed, float road_wheelangle,  //vehicle state
 	static int cnt = 0;
 	if(++cnt%20==0)
 	{
+		ROS_INFO("x: %.2f\t y:%.2f\t %.2f", current_pos_.x, current_pos_.y, current_pos_.yaw*180./M_PI);
+		ROS_INFO("nearest_index:%lu\t target_index:%lu ", nearest_point_index_, target_point_index_);
 		ROS_INFO("dis2target:%.2f\t yaw_err:%.2f\t lat_err:%.2f",dis_yaw.first,yaw_err*180.0/M_PI,lateral_err_);
 		ROS_INFO("disThreshold:%f\t expect roadwheel angle:%.2f",disThreshold_,t_roadwheel_angle_);
 		ROS_INFO("path_offset:%f\n",path_offset);

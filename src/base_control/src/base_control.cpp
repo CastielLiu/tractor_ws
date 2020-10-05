@@ -63,7 +63,8 @@ bool BaseControl::init()
 	ros::NodeHandle nh_private("~");
 	nh_private.param<std::string>("steering_port",steerMotor_port_name_,"/dev/ttyUSB0");
 	
-	sub_cmd_ = nh.subscribe("/cmd", 1, &BaseControl::cmd_callback, this);
+	std::string cmd_topic = nh_private.param<std::string>("cmd_topic","/cmd");
+	sub_cmd_ = nh.subscribe(cmd_topic, 1, &BaseControl::cmd_callback, this);
 	sub_brakeSystem_ = nh.subscribe("/brake_state", 1, &BaseControl::brakeSystem_callback, this);
 	pub_brakeCmd_ = nh.advertise<std_msgs::UInt8>("/brake_cmd", 1);
 
@@ -77,15 +78,14 @@ bool BaseControl::init()
 	steerMotor_.setRoadWheelAngleOffset(road_wheel_angle_offset);
 	steerMotor_.setRoadWheelAngleResolution(road_wheel_angle_resolution);
 
-	if(nh_private.param<bool>("is_debug", false)) //debug mode
-	{
-		ROS_INFO("[%s] debug mode, not init steering motor.", __NAME__);
-		return true;
-	}
-
 	if(!steerMotor_.init(steerMotor_port_name_,115200))
 	{
 	    ROS_ERROR("[%s] init steering motor failed.", __NAME__);
+		if(nh_private.param<bool>("is_debug", false)) //debug mode
+		{
+			ROS_INFO("[%s] debug mode, ignore init steering motor failed.", __NAME__);
+			return true;
+		}
 		return false;
 	}
 	
