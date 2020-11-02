@@ -253,6 +253,8 @@ void SteerMotor::BufferIncomingData(uint8_t *message, int length)
                     
                 else if(response_data_type_ == DataResponse_ErrorMsg)
                     error_code_ = rawVal;
+				else if(response_data_type_ == DataResponse_Reboot)
+					std::cout << "Steer Motor responsed the reboot command.\r\n";
 
             #else
 				if(2 == dataLength)//adcValue
@@ -359,7 +361,7 @@ bool SteerMotor::selfCheck()
 {
 	assert(is_read_serial_);
 	assert(is_request_state_);
-	int max_try_times = 10;
+	int max_try_times = 50;
 	std::cout << "SteerMotor is self checking..." << std::endl ;
 	while(max_try_times--)
 	{
@@ -403,13 +405,18 @@ float SteerMotor::getMotorSpeed() const
 	return motor_speed_;
 }
 
+#define STEER_MOTOR_OFFLINE 255
+#define STEER_ANGLE_SENSOR_ERROR 254
+
 uint8_t SteerMotor::getErrorMsg() const 
 {
 	//assert(is_request_state_);
 	uint64_t now = std::chrono::duration_cast<std::chrono::milliseconds>
 		(std::chrono::system_clock::now().time_since_epoch()).count();
 	if(now - last_active_time_ms_ > 200)
-		return 0xff; //离线
+		return STEER_MOTOR_OFFLINE; //离线
+	if(road_wheel_angle_ > 50 || road_wheel_angle_ < -50)
+		return STEER_ANGLE_SENSOR_ERROR;
 
 	return error_code_;
 }

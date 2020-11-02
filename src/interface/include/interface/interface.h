@@ -63,6 +63,8 @@ class Interface
 	
 	ros::ServiceServer server_driverless_status_;
 	ros::ServiceClient client_clearMotorError_;//清除转向电机错误代码
+	ros::ServiceClient client_rebootMotor_;
+	ros::ServiceClient client_resetBraker_;
 	
 
 	

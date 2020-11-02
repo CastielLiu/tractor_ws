@@ -23,8 +23,12 @@ class BaseControl
 	bool init();
 	void run();
   private:
-    bool rebootMotor(std_srvs::Empty::Request& , std_srvs::Empty::Response&);
-    bool clearMotorErrors(std_srvs::Empty::Request& , std_srvs::Empty::Response&);
+    bool rebootSteerMotorService(std_srvs::Empty::Request  &req,
+						   		std_srvs::Empty::Response &res);
+    bool clearSteerErrorService(std_srvs::Empty::Request  &req,
+						   		std_srvs::Empty::Response &res);
+    bool resetBrakeService(		std_srvs::Empty::Request  &req,
+						   		std_srvs::Empty::Response &res);
 	void cmd_callback(const driverless_msgs::ControlCmd::ConstPtr& cmd);
 	void brakeSystem_callback(const std_msgs::UInt8::ConstPtr& state);
 	void publishState_callback(const ros::TimerEvent&);
@@ -35,7 +39,10 @@ class BaseControl
 	ros::Subscriber sub_brakeSystem_;
 	ros::Publisher pub_brakeCmd_;
 	ros::Publisher pub_state_;
-	ros::ServiceServer clear_motor_error_service_;
+
+	ros::ServiceServer srv_reboot_steer_;
+    ros::ServiceServer srv_clear_steer_;
+    ros::ServiceServer srv_resetBrake_;
 	
 	driverless_msgs::BaseControlState state_;
 	driverless_msgs::ControlCmd cmd_;
@@ -71,7 +78,10 @@ bool BaseControl::init()
 	publishState_timer_ = 
 	    nh.createTimer(ros::Duration(0.1), &BaseControl::publishState_callback, this);
 	pub_state_ = nh.advertise<driverless_msgs::BaseControlState>("/base_control_state",1);
-	clear_motor_error_service_ = nh.advertiseService("/clear_motor_error_flag", &BaseControl::clearMotorErrors, this);
+	
+	srv_reboot_steer_ = nh.advertiseService("reboot_motor",&BaseControl::rebootSteerMotorService, this);
+	srv_clear_steer_  = nh.advertiseService("clear_motor_error_flag",&BaseControl::clearSteerErrorService, this);
+	srv_resetBrake_   = nh.advertiseService("reset_braker",&BaseControl::resetBrakeService, this);
 
 	float road_wheel_angle_offset = nh_private.param<float>("road_wheel_angle_offset",0.0);
  	float road_wheel_angle_resolution = nh_private.param<float>("road_wheel_angle_resolution",180.0/4096);
@@ -81,9 +91,9 @@ bool BaseControl::init()
 	if(!steerMotor_.init(steerMotor_port_name_,115200))
 	{
 	    ROS_ERROR("[%s] init steering motor failed.", __NAME__);
-		if(nh_private.param<bool>("is_debug", false)) //debug mode
+		if(nh_private.param<bool>("ignore_steer_fail", false)) //debug mode
 		{
-			ROS_INFO("[%s] debug mode, ignore init steering motor failed.", __NAME__);
+			ROS_ERROR("[%s] sytem ignore init steering motor failed.", __NAME__);
 			return true;
 		}
 		return false;
@@ -92,17 +102,25 @@ bool BaseControl::init()
     return true;
 }
 
-bool BaseControl::clearMotorErrors(std_srvs::Empty::Request& , std_srvs::Empty::Response&)
+bool BaseControl::rebootSteerMotorService(std_srvs::Empty::Request  &req,std_srvs::Empty::Response &res)
 {
-    steerMotor_.clearErrorFlag();
-    return true;
-}
-
-bool BaseControl::rebootMotor(std_srvs::Empty::Request& , std_srvs::Empty::Response&)
-{
+	ROS_INFO("[%s] Request reboot the steer motor.", __NAME__);
     steerMotor_.reboot();
     return true;
 }
+bool BaseControl::clearSteerErrorService(std_srvs::Empty::Request  &req,std_srvs::Empty::Response &res)
+{
+	ROS_INFO("[%s] Request clear the steer motor error flag.", __NAME__);
+    steerMotor_.clearErrorFlag();
+    return true;
+}
+bool BaseControl::resetBrakeService(std_srvs::Empty::Request  &req,std_srvs::Empty::Response &res)
+{
+	ROS_INFO("[%s] Request reset the braker.", __NAME__);
+    
+	return true;
+}
+
 
 void BaseControl::brakeSystem_callback(const std_msgs::UInt8::ConstPtr& state)
 {
@@ -133,8 +151,10 @@ void BaseControl::cmd_callback(const driverless_msgs::ControlCmd::ConstPtr& msg)
 	if(!msg->driverless_mode) //exit auto drive
 		steerMotor_.disable();
 	else //enter auto drive, enable the steering
+	{
 		steerMotor_.enable();
-	steerMotor_.setRoadWheelAngle(msg->set_roadWheelAngle);
+		steerMotor_.setRoadWheelAngle(msg->set_roadWheelAngle);
+	}
 	
 	//转发制动指令
 	std_msgs::UInt8 brakeVal;
@@ -148,5 +168,6 @@ int main(int argc, char** argv)
 	BaseControl base_control;
 	if(base_control.init())
 		ros::spin();
+	std::cout << "[" << __NAME__ << "] exit!" << std::endl; 
 	return 0;
 }

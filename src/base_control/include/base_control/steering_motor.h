@@ -14,7 +14,6 @@
 
 class SteerMotor
 {
-	
   public:
 	SteerMotor();
 	~SteerMotor();

@@ -52,6 +52,10 @@ bool Interface::init()
 	client_driverless_ = nh.serviceClient<interface::Driverless>("driverless_service");
 	//创建清除转向电机错误代码客户端
 	client_clearMotorError_ = nh.serviceClient<std_srvs::Empty>("clear_motor_error_flag");
+	//创建重启转向电机客户端
+	client_rebootMotor_ = nh.serviceClient<std_srvs::Empty>("reboot_motor");
+	//创建复位制动执行器客户端
+	client_resetBraker_ = nh.serviceClient<std_srvs::Empty>("reset_braker");
 	
 	nh_private.param<std::string>("can2serial_port",can2serial_port_,"");
 	nh_private.param<int>("can_baudrate",can_baudrate_,250);
@@ -124,7 +128,7 @@ void Interface::callServiceThread(const CanMsg_t& can_msg)
 		can2serial_->showCanMsg(can_msg, "request record path");
 		can2serial_->showCanMsg(can_pkgs_.response, "response record path");
 	}
-	else if(can_msg.ID == DRIVERLESS_CAN_ID)
+	else if(can_msg.ID == DRIVERLESS_CAN_ID)  //自动驾驶
 	{
 		interface::Driverless srv_driverless;
 		srv_driverless.request.command_type = can_msg.data[3];   //指令类型
@@ -151,16 +155,18 @@ void Interface::callServiceThread(const CanMsg_t& can_msg)
 		can2serial_->showCanMsg(can_msg, "request diverless");
 		can2serial_->showCanMsg(can_pkgs_.response, "response diverless");
 	}
-	else if(can_msg.ID == RESET_CAN_ID)//系统复位
+	else if(can_msg.ID == RESET_CAN_ID) //系统复位
 	{
 		systemResetMsg_t *resetMsg = (systemResetMsg_t *)can_msg.data;
+		std_srvs::Empty empty;
 		if(resetMsg->clearMotorError) //清除转向电机错误标志
-		{
-			std_srvs::Empty empty;
 			client_clearMotorError_.call(empty);
-		}
-		else if(resetMsg->rebootMotor) //重启转向电机
-			;
+		if(resetMsg->rebootMotor) //重启转向电机
+			client_rebootMotor_.call(empty);
+		if(resetMsg->brakeReset)  //复位制动执行器
+			client_resetBraker_.call(empty);
+		
+		can2serial_->showCanMsg(can_msg, "request reset");
 	}
 
 	threadIsRunning = false;

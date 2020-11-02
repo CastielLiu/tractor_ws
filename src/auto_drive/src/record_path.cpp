@@ -134,7 +134,7 @@ bool Recorder::recordCurrentVertex(const gpsMsg_t& pose)
 	
 	if(dis < 1.0)
 	{
-		ROS_ERROR("[%s] Request record current point, but too close to the previous point." __NAME__);
+		ROS_ERROR("[%s] Request record current point, but too close to the previous point.", __NAME__);
 		return false;
 	}
 	

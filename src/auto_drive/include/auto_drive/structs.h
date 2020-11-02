@@ -11,6 +11,13 @@ typedef struct
 	float curvature;
 	float maxOffset_left;
 	float maxOffset_right;
+
+	void reset()
+	{
+		longitude = latitude = yaw = x = y 
+				  = curvature = maxOffset_left 
+				  = maxOffset_right = 0.0;
+	}
 }gpsMsg_t;
 
 typedef struct

@@ -56,18 +56,21 @@ private:
 	ros::Publisher pub_cmd_;
     ros::Publisher pub_state_;
     ros::Subscriber sub_utm_;
-    ros::Subscriber sub_state_;
+    ros::Subscriber sub_base_control_state_;
     ros::Timer update_timer_;
 
     ros::ServiceServer srv_driverless_;
     ros::ServiceServer srv_recorder_;
+
     ros::NodeHandle nh_, nh_private_;
 
     std::mutex auto_drive_thread_mutex_;
-
     driverless_msgs::ControlCmd cmd_;
+
+    std::mutex base_state_mutux_;
+    driverless_msgs::BaseControlState base_state_;
     
-    StateMachine state_;
+    StateMachine sys_state_;
 
     float avoid_offset_;
 
