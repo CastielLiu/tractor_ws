@@ -22,7 +22,7 @@
 		<param name="min_foresight_distance" value="4.0"/>
 		<param name="wheel_base" value="2.0"/>
 		<param name="cmd_topic" value="$(arg cmd_topic)"/>
-		<param name="ignore_gps_offline" value="true"/>
+		<param name="ignore_gps_offline" value="false"/>
 	</node>
 	
 	<!-- gps -->
@@ -44,7 +44,8 @@
 		<param name="road_wheel_angle_resolution" value="0.04"/> <!--1 adc 对应的角度值 -->
 		<param name="cmd_topic" value="$(arg cmd_topic)"/>
 		
-		<param name="ignore_steer_fail" value="false"/>
+		<param name="ignore_steer_error" value="false"/>
+		<param name="ignore_braker_error" value="true"/>
 	</node>
 
 	<node name="rviz" pkg="rviz" type="rviz" args="-d $(find auto_drive)/rviz/auto_drive.rviz"/>

@@ -333,6 +333,7 @@ bool AutoDrive::recordPathService(interface::RecordPath::Request  &req,
 		}
 
 		bool ok = recorder_.recordCurrentVertex(pose_);
+		res.point_cnt = recorder_.getRecordedVerTexCnt();
 		if(!ok)
 		{
 			res.success = res.FAIL;

@@ -54,6 +54,8 @@ class BaseControl
 	std::atomic<bool> driverless_mode_;
 	ros::Timer publishState_timer_;
 	double lastBrakeValueTime_;
+	bool ignore_braker_error_;
+	bool ignore_steer_error_;
 	uint8_t brake_value_;
 };
 
@@ -97,10 +99,13 @@ bool BaseControl::init()
 	steerMotor_.setRoadWheelAngleOffset(road_wheel_angle_offset);
 	steerMotor_.setRoadWheelAngleResolution(road_wheel_angle_resolution);
 
+	ignore_steer_error_ = nh_private.param<bool>("ignore_steer_error", false);
+	ignore_braker_error_ = nh_private.param<bool>("ignore_braker_error", false);
+
 	if(!steerMotor_.init(steerMotor_port_name_,115200))
 	{
 	    ROS_ERROR("[%s] init steering motor failed.", __NAME__);
-		if(nh_private.param<bool>("ignore_steer_fail", false)) //debug mode
+		if(ignore_steer_error_) //debug mode
 		{
 			ROS_ERROR("[%s] sytem ignore init steering motor failed.", __NAME__);
 			return true;
@@ -146,7 +151,8 @@ void BaseControl::publishState_callback(const ros::TimerEvent&)
     state_.steerMotorError = steerMotor_.getErrorMsg();
 
 	//制动系统状态反馈
-	if(ros::Time::now().toSec() - lastBrakeValueTime_ > 0.5) //制动系统状态反馈超时
+	if(ros::Time::now().toSec() - lastBrakeValueTime_ > 0.5 && //制动系统状态反馈超时
+		!ignore_braker_error_) 
 		state_.brakeError = state_.BRAKE_ERROR_OFFLINE;
 	else
 		state_.brakeError = state_.BRAKE_ERROR_NONE;

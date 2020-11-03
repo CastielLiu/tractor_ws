@@ -60,6 +60,7 @@ public:
 	bool startVertexPathRecord(const std::string& file_name);
 	bool recordCurrentVertex(const gpsMsg_t& pose);
 	void stopVertexRecord(bool discard);
+	int  getRecordedVerTexCnt(){return recorded_vertex_cnt_;}
 
 private:
 	bool tryOpenFile(const std::string& full_file);
@@ -74,6 +75,7 @@ private:
 	uint8_t vertex_recorder_state_;  //顶点路径记录器状态
 	std::mutex curve_recorder_mutex_;//连续路径记录线程互斥量，用于判断线程是否已经退出
 	FILE *fp_;                       //路径文件句柄
+	int recorded_vertex_cnt_;        //当前顶点型记录任务已经记录的顶点个数
 	
 	gpsMsg_t last_point_ , current_point_;
 	std::function<getPoseFun_t> getPose_;
