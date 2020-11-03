@@ -17,6 +17,7 @@ add_message_files(
     BaseControlState.msg
     ControlCmd.msg
     PathTrackingInfo.msg
+    SteerMotorDebug.msg
 )
 
 generate_messages(

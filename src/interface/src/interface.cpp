@@ -10,7 +10,8 @@
 
 Interface::Interface():
 	gps_odom_flag_(false),
-	tracking_info_flag_(false)
+	tracking_info_flag_(false),
+	last_gps_time_(0.0)
 {
 	can2serial_ = new Can2serial;
 	setlocale(LC_ALL, ""); //调试信息中文编码
@@ -195,7 +196,7 @@ void Interface::readCanMsg()
 				break;
 			}
 			default:
-				ROS_ERROR("[%s] Unknown CAN ID." __NAME__);
+				ROS_ERROR("[%s] Unknown CAN ID.", __NAME__);
 				break;
 		}
 	}
@@ -203,6 +204,7 @@ void Interface::readCanMsg()
 
 void Interface::odom_callback(const nav_msgs::Odometry::ConstPtr& msg)
 {
+	last_gps_time_ = ros::Time::now().toSec();
 	double yaw = msg->pose.covariance[0] *180.0/M_PI;
 	double longitude = msg->pose.covariance[1];
 	double latitude = msg->pose.covariance[2];
@@ -238,14 +240,18 @@ void Interface::path_tracking_info_callback(const driverless_msgs::PathTrackingI
 //底层控制状态反馈
 void Interface::baseControlState_callback(const driverless_msgs::BaseControlState::ConstPtr& msg)
 {
+	heart_beat_pkg_mutex_.lock();
 	heart_beat_pkg_.brakeSystemState = msg->brakeError;     //制动系统状态
 	heart_beat_pkg_.steerMotorState = msg->steerMotorError; //转向系统状态
+	heart_beat_pkg_mutex_.unlock();
 }
 
 //驾驶系统状态反馈
 void Interface::driveSystemState_callback(const std_msgs::UInt8::ConstPtr& msg)
 {
+	heart_beat_pkg_mutex_.lock();
 	heart_beat_pkg_.driveSystemState = msg->data;
+	heart_beat_pkg_mutex_.unlock();
 }
 
 
@@ -272,10 +278,17 @@ void Interface::msgReport_callback(const ros::TimerEvent& event)
 //发送心跳包
 void Interface::heartbeat_callback(const ros::TimerEvent& event)
 {
+	heart_beat_pkg_mutex_.lock();
+	if(ros::Time::now().toSec() - last_gps_time_ > 0.3)
+		heart_beat_pkg_.gpsState = 1; //offline
+	else
+		heart_beat_pkg_.gpsState = 0; //online
+
 	memcpy(can_pkgs_.heartbeat.data, &heart_beat_pkg_, sizeof(heart_beat_pkg_));
 	
 	can2serial_->sendCanMsg(can_pkgs_.heartbeat);
 	//can2serial_->showCanMsg(can_pkgs_.heartbeat);
+	heart_beat_pkg_mutex_.unlock();
 }
 
 int main(int argc,char** argv)

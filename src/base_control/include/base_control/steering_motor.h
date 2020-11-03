@@ -27,6 +27,7 @@ class SteerMotor
 	void enable();
 	bool is_enabled(){return is_enabled_;}
 	void setRoadWheelAngle(float angle);
+	void setSpeedAndAngle(float speed, float angle);
 	float getRoadWheelAngle() const;
 	float getMotorSpeed() const;
 	uint8_t getErrorMsg() const;
@@ -88,8 +89,10 @@ class SteerMotor
 	std::mutex read_serial_thread_mutex_;
 	std::mutex request_state_thread_mutex_;
 	
+	const int max_speed_, min_speed_;  //转向电机的最大最小转向速度
+	const float max_road_wheel_angle_; //最大的前轮转角
+
 	float road_wheel_angle_;
-	
 	float road_wheel_angle_resolution_;
 	float road_wheel_angle_offset_;
 	bool is_enabled_;

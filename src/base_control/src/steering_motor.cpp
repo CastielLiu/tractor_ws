@@ -30,7 +30,10 @@ static const uint16_t CRC16Table[]={
 #define MAX_LOAD_SIZE 100
 static uint8_t raw_buffer[MAX_LOAD_SIZE];
 
-SteerMotor::SteerMotor()
+SteerMotor::SteerMotor():
+	max_speed_(40),
+	min_speed_(5),
+	max_road_wheel_angle_(40)
 {
 	serial_port_ = NULL;
 	is_read_serial_ = false;
@@ -609,16 +612,32 @@ uint16_t SteerMotor::generateModBusCRC_byTable(const uint8_t *ptr,uint8_t size)
     return CRC16;  
 }
 
+void SteerMotor::setSpeedAndAngle(float speed, float angle)
+{
+	if(speed > max_speed_) speed = max_speed_;
+	else if(speed < min_speed_) speed = min_speed_;
+
+	float angle_diff = angle - road_wheel_angle_;
+
+	if(angle_diff > max_road_wheel_angle_)
+		angle_diff = max_road_wheel_angle_;
+	else if(angle_diff < -max_road_wheel_angle_)
+		angle_diff = -max_road_wheel_angle_;
+	
+	this->rotate(angle_diff, speed);
+}
+
 void SteerMotor::setRoadWheelAngle(float angle)
 {
-    static uint8_t rotate_speed_min = 5;
-    static uint8_t rotate_speed_max = 40;
-    static float angle_diff_max = 40; //deg
-    
     float angle_diff = angle - road_wheel_angle_;
-    
+
+	if(angle_diff > max_road_wheel_angle_)
+		angle_diff = max_road_wheel_angle_;
+	else if(angle_diff < -max_road_wheel_angle_)
+		angle_diff = -max_road_wheel_angle_;
+	
     //根据角度偏差大小调节转速
-    uint8_t rotate_speed = fabs(angle_diff)/angle_diff_max *(rotate_speed_max-rotate_speed_min) + rotate_speed_min;
+    uint8_t rotate_speed = fabs(angle_diff)/max_road_wheel_angle_ *(max_speed_-min_speed_) + min_speed_;
     
     this->rotate(angle_diff, rotate_speed);
     

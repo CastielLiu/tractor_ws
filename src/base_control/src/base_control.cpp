@@ -1,6 +1,7 @@
 #include"base_control/steering_motor.h"
 #include<driverless_msgs/ControlCmd.h>
 #include<driverless_msgs/BaseControlState.h>
+#include<driverless_msgs/SteerMotorDebug.h>
 #include<ros/ros.h>
 #include <std_msgs/Int8.h>
 #include <std_msgs/UInt8.h>
@@ -8,6 +9,7 @@
 #include<iostream>
 #include<std_srvs/Empty.h>
 #include<string>
+#include <atomic>
 
 #ifndef PACK
 #define PACK( __Declaration__ ) __Declaration__ __attribute__((__packed__))
@@ -30,6 +32,7 @@ class BaseControl
     bool resetBrakeService(		std_srvs::Empty::Request  &req,
 						   		std_srvs::Empty::Response &res);
 	void cmd_callback(const driverless_msgs::ControlCmd::ConstPtr& cmd);
+	void steerDebug_callback(const driverless_msgs::SteerMotorDebug::ConstPtr& debug);
 	void brakeSystem_callback(const std_msgs::UInt8::ConstPtr& state);
 	void publishState_callback(const ros::TimerEvent&);
 	SteerMotor steerMotor_;
@@ -37,6 +40,8 @@ class BaseControl
 	
 	ros::Subscriber sub_cmd_;
 	ros::Subscriber sub_brakeSystem_;
+	ros::Subscriber sub_steer_debug_;
+
 	ros::Publisher pub_brakeCmd_;
 	ros::Publisher pub_state_;
 
@@ -46,6 +51,7 @@ class BaseControl
 	
 	driverless_msgs::BaseControlState state_;
 	driverless_msgs::ControlCmd cmd_;
+	std::atomic<bool> driverless_mode_;
 	ros::Timer publishState_timer_;
 	double lastBrakeValueTime_;
 	uint8_t brake_value_;
@@ -53,7 +59,8 @@ class BaseControl
 
 BaseControl::BaseControl():
 	brake_value_(0),
-	lastBrakeValueTime_(0)
+	lastBrakeValueTime_(0),
+	driverless_mode_(false)
 {
 	
 }
@@ -72,6 +79,8 @@ bool BaseControl::init()
 	
 	std::string cmd_topic = nh_private.param<std::string>("cmd_topic","/cmd");
 	sub_cmd_ = nh.subscribe(cmd_topic, 1, &BaseControl::cmd_callback, this);
+	sub_steer_debug_ = nh.subscribe("/steer_motor_debug", 1, &BaseControl::steerDebug_callback, this);
+
 	sub_brakeSystem_ = nh.subscribe("/brake_state", 1, &BaseControl::brakeSystem_callback, this);
 	pub_brakeCmd_ = nh.advertise<std_msgs::UInt8>("/brake_cmd", 1);
 
@@ -148,18 +157,51 @@ void BaseControl::publishState_callback(const ros::TimerEvent&)
 
 void BaseControl::cmd_callback(const driverless_msgs::ControlCmd::ConstPtr& msg)
 {
-	if(!msg->driverless_mode) //exit auto drive
-		steerMotor_.disable();
+	static int try_disable_motor_cnt = 0;
+	if(!msg->driverless_mode && driverless_mode_) //上次处于自动驾驶模式，当前请求关闭
+		try_disable_motor_cnt = 5;
+	
+	if(!msg->driverless_mode)
+	{
+		if(try_disable_motor_cnt > 0)
+		{
+			--try_disable_motor_cnt;
+			steerMotor_.disable();
+		}
+	}
 	else //enter auto drive, enable the steering
 	{
 		steerMotor_.enable();
 		steerMotor_.setRoadWheelAngle(msg->set_roadWheelAngle);
 	}
+
+	driverless_mode_ = msg->driverless_mode;
 	
 	//转发制动指令
 	std_msgs::UInt8 brakeVal;
 	brakeVal.data = msg->set_brake;
 	pub_brakeCmd_.publish(brakeVal);
+}
+
+void BaseControl::steerDebug_callback(const driverless_msgs::SteerMotorDebug::ConstPtr& debug)
+{
+	if(driverless_mode_) //目前为自动驾驶模式，禁止使用转向电机调试电机
+	{
+		ROS_ERROR("[%s] Can not debug steer motor in driverless mode!", __NAME__);
+		return;
+	}
+
+	if(debug->steer_enable)
+	{
+		steerMotor_.enable();
+		steerMotor_.setSpeedAndAngle(debug->set_speed, debug->set_roadWheelAngle);
+	}
+	else
+	{
+		steerMotor_.disable();
+	}
+
+		
 }
 
 int main(int argc, char** argv)

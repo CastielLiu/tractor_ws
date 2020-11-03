@@ -15,6 +15,8 @@
 #include <std_srvs/Empty.h>
 #include <std_msgs/UInt8.h>
 #include <thread>
+#include <mutex>
+#include <atomic>
 #include "structs.h"
 
 
@@ -44,6 +46,7 @@ class Interface
 
 	canMsgs_t can_pkgs_;
 	heartbeatStruct_t heart_beat_pkg_;
+	std::mutex heart_beat_pkg_mutex_;
 	
 	bool gps_odom_flag_, tracking_info_flag_;
 	
@@ -66,8 +69,7 @@ class Interface
 	ros::ServiceClient client_rebootMotor_;
 	ros::ServiceClient client_resetBraker_;
 	
-
-	
+	std::atomic<double> last_gps_time_;
 };
 
 
