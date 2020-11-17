@@ -28,7 +28,7 @@ typedef struct CanMsgs
         heartbeat.ID = HEARTBEAT_CAN_ID;
         heartbeat.len = 2;
         response.ID = RESPONSE_CAN_ID;
-	    response.len = 3;
+	    response.len = 4;
     }
     
 } canMsgs_t;

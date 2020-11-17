@@ -124,7 +124,9 @@ void Interface::callServiceThread(const CanMsg_t& can_msg)
 		client_recordPath_.call(srv_record_path);
 		can_pkgs_.response.data[0] = 0x00;//response record path
 		can_pkgs_.response.data[1] = srv_record_path.response.success;
-		can_pkgs_.response.data[2] = srv_record_path.response.point_cnt;
+		can_pkgs_.response.data[2] = srv_record_path.response.point_cnt%256;
+		can_pkgs_.response.data[3] = srv_record_path.response.point_cnt/256;
+		
 		can2serial_->sendCanMsg(can_pkgs_.response); //response
 
 		can2serial_->showCanMsg(can_msg, "request record path");
