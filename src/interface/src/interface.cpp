@@ -235,7 +235,7 @@ void Interface::path_tracking_info_callback(const driverless_msgs::PathTrackingI
 	can_pkgs_.gpsMsg.data[4] = speed/256;
 	
 	uint16_t lateral_err = uint16_t(info->lateral_err*100) + 255;
-//	ROS_INFO("lateral_err:%d",lateral_err);
+	//ROS_INFO("lateral_err:%.2f \t speed:%.2f",info->lateral_err,info->speed );
 	can_pkgs_.gpsMsg.data[4] |= lateral_err%2 << 7;
 	can_pkgs_.gpsMsg.data[5] = lateral_err/2;
 }
