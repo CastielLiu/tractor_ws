@@ -9,8 +9,7 @@
 #define __NAME__ "interface_node"
 
 Interface::Interface():
-	gps_odom_flag_(false),
-	tracking_info_flag_(false),
+	gps_validity_(false),
 	last_gps_time_(0.0)
 {
 	can2serial_ = new Can2serial;
@@ -28,15 +27,15 @@ bool Interface::init()
 	ros::NodeHandle nh;
 	ros::NodeHandle nh_private("~");
 	
-	std::string utm_topic = nh_private.param<std::string>("utm_topic","");
+	std::string gps_topic = nh_private.param<std::string>("gps_topic","");
 	
-	if(utm_topic.empty())
+	if(gps_topic.empty())
 	{
-		ROS_ERROR("[%s] Please input utm_topic in launch file!", __NAME__);
+		ROS_ERROR("[%s] Please input gps_topic in launch file!", __NAME__);
 		return false;
 	}
 
-	sub_gps_ = nh.subscribe(utm_topic, 1,&Interface::odom_callback,this);
+	sub_gps_ = nh.subscribe(gps_topic, 1,&Interface::gps_callback,this);
 
 	sub_pathtracking_info_ = 
 		nh.subscribe("tracking_info",1,&Interface::path_tracking_info_callback, this);
@@ -205,35 +204,30 @@ void Interface::readCanMsg()
 	}
 }
 
-void Interface::odom_callback(const nav_msgs::Odometry::ConstPtr& msg)
+void Interface::gps_callback(const gps_msgs::Inspvax::ConstPtr& msg)
 {
 	last_gps_time_ = ros::Time::now().toSec();
-	double yaw = msg->pose.covariance[0] *180.0/M_PI;
-	double longitude = msg->pose.covariance[1];
-	double latitude = msg->pose.covariance[2];
-	uint16_t height = msg->pose.pose.position.z * 10 + 2000;
+	double yaw = msg->azimuth;
+	uint16_t height = msg->height * 10 + 2000;
 	
-	if(longitude > 0 && latitude >0)
-		gps_odom_flag_ = true;
-	else
-		gps_odom_flag_ = false;
-
-	*(uint32_t *)(can_pkgs_.gpsPos.data) = uint32_t (longitude*10000000);
-	*(uint32_t *)(can_pkgs_.gpsPos.data+4) = uint32_t (latitude*10000000);
+	*(uint32_t *)(can_pkgs_.gpsPos.data) = uint32_t (msg->longitude*10000000);
+	*(uint32_t *)(can_pkgs_.gpsPos.data+4) = uint32_t (msg->latitude*10000000);
 	
 	*(uint16_t *)(can_pkgs_.gpsMsg.data) = uint16_t(yaw*10); //yaw
 	can_pkgs_.gpsMsg.data[2] = 10 << 3;  //satellite_num << 3
 	can_pkgs_.gpsMsg.data[2] |= 0x01; // none differentiation positioning 
 	*(uint16_t *)(can_pkgs_.gpsMsg.data+6) = height;
+
+	float speed = sqrt(msg->east_velocity*msg->east_velocity+msg->north_velocity*msg->north_velocity);
+	uint16_t u16_speed = uint16_t(speed *10);
+	can_pkgs_.gpsMsg.data[3] = u16_speed%256;
+	can_pkgs_.gpsMsg.data[4] = u16_speed/256;
 }
 
 void Interface::path_tracking_info_callback(const driverless_msgs::PathTrackingInfo::ConstPtr& info)
 {
-	tracking_info_flag_ = true;
-	uint16_t speed = uint16_t(info->speed *10);
-	can_pkgs_.gpsMsg.data[3] = speed%256;
-	can_pkgs_.gpsMsg.data[4] = speed/256;
-	
+	last_track_info_time_ = ros::Time::now().toSec();
+
 	uint16_t lateral_err = uint16_t(info->lateral_err*100) + 255;
 	//ROS_INFO("lateral_err:%.2f \t speed:%.2f",info->lateral_err,info->speed );
 	can_pkgs_.gpsMsg.data[4] |= lateral_err%2 << 7;
@@ -261,14 +255,14 @@ void Interface::driveSystemState_callback(const std_msgs::UInt8::ConstPtr& msg)
 //状态数据定时上报
 void Interface::msgReport_callback(const ros::TimerEvent& event)
 {
-	if(gps_odom_flag_)
+	if(gps_validity_)
 	{
 		can2serial_->sendCanMsg(can_pkgs_.gpsPos);
 //		can2serial_->showCanMsg(can_pkgs_.gpsPos);
 		usleep(1000);
 	}
-	if(!tracking_info_flag_)
-	{	//若跟踪信息无效,横向偏差置0
+	if(ros::Time::now().toSec() - last_track_info_time_ > 0.3)
+	{	//若跟踪信息超时,横向偏差置0
 		uint16_t lateral_err = uint16_t(0.0*100) + 255;
 		can_pkgs_.gpsMsg.data[4] |= lateral_err%2 << 7;
 		can_pkgs_.gpsMsg.data[5] = lateral_err/2;
@@ -283,9 +277,15 @@ void Interface::heartbeat_callback(const ros::TimerEvent& event)
 {
 	heart_beat_pkg_mutex_.lock();
 	if(ros::Time::now().toSec() - last_gps_time_ > 0.3)
+	{
 		heart_beat_pkg_.gpsState = 1; //offline
+		gps_validity_ = false;
+	}
 	else
+	{
 		heart_beat_pkg_.gpsState = 0; //online
+		gps_validity_ = true;
+	}
 
 	memcpy(can_pkgs_.heartbeat.data, &heart_beat_pkg_, sizeof(heart_beat_pkg_));
 	

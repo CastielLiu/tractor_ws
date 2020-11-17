@@ -14,6 +14,7 @@
 #include <interface/DriverlessStatus.h>
 #include <std_srvs/Empty.h>
 #include <std_msgs/UInt8.h>
+#include <gps_msgs/Inspvax.h>
 #include <thread>
 #include <mutex>
 #include <atomic>
@@ -30,7 +31,7 @@ class Interface
 	
   private:
 	void readCanMsg();
-	void odom_callback(const nav_msgs::Odometry::ConstPtr& gps);
+	void gps_callback(const gps_msgs::Inspvax::ConstPtr& msg);
 	void msgReport_callback(const ros::TimerEvent& event);
 	void heartbeat_callback(const ros::TimerEvent& event);
 	void callServiceThread(const CanMsg_t& can_msg);
@@ -47,8 +48,10 @@ class Interface
 	canMsgs_t can_pkgs_;
 	heartbeatStruct_t heart_beat_pkg_;
 	std::mutex heart_beat_pkg_mutex_;
-	
-	bool gps_odom_flag_, tracking_info_flag_;
+
+	bool gps_validity_;
+	std::atomic<double> last_gps_time_;
+	std::atomic<double> last_track_info_time_;
 	
 	ros::Subscriber sub_gps_;
 	ros::Subscriber sub_pathtracking_info_;
@@ -69,7 +72,7 @@ class Interface
 	ros::ServiceClient client_rebootMotor_;
 	ros::ServiceClient client_resetBraker_;
 	
-	std::atomic<double> last_gps_time_;
+	
 };
 
 
