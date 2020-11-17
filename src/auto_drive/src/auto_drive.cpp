@@ -224,6 +224,8 @@ void AutoDrive::autoDriveThread(float speed)
 #endif
 }
 
+//定时发布控制指令
+//定时发布状态数据
 void AutoDrive::update_timer_callback(const ros::TimerEvent&)
 {
 	if(state_.get()==state_.State_VertexTracking ||
