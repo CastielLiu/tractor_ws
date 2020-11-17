@@ -91,7 +91,6 @@ void Recorder::curvePathRecordThread()
 		}
 		sleep_ms(50);
 	}
-
 }
 
 bool Recorder::startVertexPathRecord(const std::string& file_name)
@@ -101,6 +100,7 @@ bool Recorder::startVertexPathRecord(const std::string& file_name)
 	if(!tryOpenFile(full_file_now_))        //新建并打开路径文件
 		return false;
 	
+	recorded_vertex_cnt_ = 0;    //开始新的顶点型路径记录，复位点数
 	vertex_recorder_state_ = VertexPathRecorderState_Waiting;
 	return true;
 }
@@ -134,7 +134,7 @@ bool Recorder::recordCurrentVertex(const gpsMsg_t& pose)
 	
 	if(dis < 1.0)
 	{
-		ROS_ERROR("[%s] Request record current point, but too close to the previous point." __NAME__);
+		ROS_ERROR("[%s] Request record current point, but too close to the previous point.", __NAME__);
 		return false;
 	}
 	
@@ -142,12 +142,14 @@ bool Recorder::recordCurrentVertex(const gpsMsg_t& pose)
 	fprintf(fp_,"%.3f\t%.3f\t%.3f\r\n",pose.x,pose.y,pose.yaw);
 	fflush(fp_);
 
+	recorded_vertex_cnt_ ++;  //已记录顶点个数自加
 	last_vertex = pose;
 	return true;
 }
 
 void Recorder::stopWithoutSave()
 {
+	ROS_ERROR("[%s] Close current recording without save!", __NAME__);
 	stopCurveRecord(true); //退出连续路径记录器，并丢弃记录文件
 	stopVertexRecord(true); //退出顶点路径记录器，并丢弃记录文件
 }

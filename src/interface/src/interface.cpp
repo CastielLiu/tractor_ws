@@ -10,7 +10,8 @@
 
 Interface::Interface():
 	gps_odom_flag_(false),
-	tracking_info_flag_(false)
+	tracking_info_flag_(false),
+	last_gps_time_(0.0)
 {
 	can2serial_ = new Can2serial;
 	setlocale(LC_ALL, ""); //调试信息中文编码
@@ -52,6 +53,10 @@ bool Interface::init()
 	client_driverless_ = nh.serviceClient<interface::Driverless>("driverless_service");
 	//创建清除转向电机错误代码客户端
 	client_clearMotorError_ = nh.serviceClient<std_srvs::Empty>("clear_motor_error_flag");
+	//创建重启转向电机客户端
+	client_rebootMotor_ = nh.serviceClient<std_srvs::Empty>("reboot_motor");
+	//创建复位制动执行器客户端
+	client_resetBraker_ = nh.serviceClient<std_srvs::Empty>("reset_braker");
 	
 	nh_private.param<std::string>("can2serial_port",can2serial_port_,"");
 	nh_private.param<int>("can_baudrate",can_baudrate_,250);
@@ -119,12 +124,13 @@ void Interface::callServiceThread(const CanMsg_t& can_msg)
 		client_recordPath_.call(srv_record_path);
 		can_pkgs_.response.data[0] = 0x00;//response record path
 		can_pkgs_.response.data[1] = srv_record_path.response.success;
+		can_pkgs_.response.data[2] = srv_record_path.response.point_cnt;
 		can2serial_->sendCanMsg(can_pkgs_.response); //response
 
 		can2serial_->showCanMsg(can_msg, "request record path");
 		can2serial_->showCanMsg(can_pkgs_.response, "response record path");
 	}
-	else if(can_msg.ID == DRIVERLESS_CAN_ID)
+	else if(can_msg.ID == DRIVERLESS_CAN_ID)  //自动驾驶
 	{
 		interface::Driverless srv_driverless;
 		srv_driverless.request.command_type = can_msg.data[3];   //指令类型
@@ -151,16 +157,18 @@ void Interface::callServiceThread(const CanMsg_t& can_msg)
 		can2serial_->showCanMsg(can_msg, "request diverless");
 		can2serial_->showCanMsg(can_pkgs_.response, "response diverless");
 	}
-	else if(can_msg.ID == RESET_CAN_ID)//系统复位
+	else if(can_msg.ID == RESET_CAN_ID) //系统复位
 	{
 		systemResetMsg_t *resetMsg = (systemResetMsg_t *)can_msg.data;
+		std_srvs::Empty empty;
 		if(resetMsg->clearMotorError) //清除转向电机错误标志
-		{
-			std_srvs::Empty empty;
 			client_clearMotorError_.call(empty);
-		}
-		else if(resetMsg->rebootMotor) //重启转向电机
-			;
+		if(resetMsg->rebootMotor) //重启转向电机
+			client_rebootMotor_.call(empty);
+		if(resetMsg->brakeReset)  //复位制动执行器
+			client_resetBraker_.call(empty);
+		
+		can2serial_->showCanMsg(can_msg, "request reset");
 	}
 
 	threadIsRunning = false;
@@ -189,7 +197,7 @@ void Interface::readCanMsg()
 				break;
 			}
 			default:
-				ROS_ERROR("[%s] Unknown CAN ID." __NAME__);
+				ROS_ERROR("[%s] Unknown CAN ID.", __NAME__);
 				break;
 		}
 	}
@@ -197,6 +205,7 @@ void Interface::readCanMsg()
 
 void Interface::odom_callback(const nav_msgs::Odometry::ConstPtr& msg)
 {
+	last_gps_time_ = ros::Time::now().toSec();
 	double yaw = msg->pose.covariance[0] *180.0/M_PI;
 	double longitude = msg->pose.covariance[1];
 	double latitude = msg->pose.covariance[2];
@@ -232,14 +241,18 @@ void Interface::path_tracking_info_callback(const driverless_msgs::PathTrackingI
 //底层控制状态反馈
 void Interface::baseControlState_callback(const driverless_msgs::BaseControlState::ConstPtr& msg)
 {
+	heart_beat_pkg_mutex_.lock();
 	heart_beat_pkg_.brakeSystemState = msg->brakeError;     //制动系统状态
 	heart_beat_pkg_.steerMotorState = msg->steerMotorError; //转向系统状态
+	heart_beat_pkg_mutex_.unlock();
 }
 
 //驾驶系统状态反馈
 void Interface::driveSystemState_callback(const std_msgs::UInt8::ConstPtr& msg)
 {
+	heart_beat_pkg_mutex_.lock();
 	heart_beat_pkg_.driveSystemState = msg->data;
+	heart_beat_pkg_mutex_.unlock();
 }
 
 
@@ -266,10 +279,17 @@ void Interface::msgReport_callback(const ros::TimerEvent& event)
 //发送心跳包
 void Interface::heartbeat_callback(const ros::TimerEvent& event)
 {
+	heart_beat_pkg_mutex_.lock();
+	if(ros::Time::now().toSec() - last_gps_time_ > 0.3)
+		heart_beat_pkg_.gpsState = 1; //offline
+	else
+		heart_beat_pkg_.gpsState = 0; //online
+
 	memcpy(can_pkgs_.heartbeat.data, &heart_beat_pkg_, sizeof(heart_beat_pkg_));
 	
 	can2serial_->sendCanMsg(can_pkgs_.heartbeat);
 	//can2serial_->showCanMsg(can_pkgs_.heartbeat);
+	heart_beat_pkg_mutex_.unlock();
 }
 
 int main(int argc,char** argv)

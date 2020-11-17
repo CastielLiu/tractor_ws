@@ -30,7 +30,10 @@ static const uint16_t CRC16Table[]={
 #define MAX_LOAD_SIZE 100
 static uint8_t raw_buffer[MAX_LOAD_SIZE];
 
-SteerMotor::SteerMotor()
+SteerMotor::SteerMotor():
+	max_speed_(40),
+	min_speed_(5),
+	max_road_wheel_angle_(40)
 {
 	serial_port_ = NULL;
 	is_read_serial_ = false;
@@ -253,6 +256,8 @@ void SteerMotor::BufferIncomingData(uint8_t *message, int length)
                     
                 else if(response_data_type_ == DataResponse_ErrorMsg)
                     error_code_ = rawVal;
+				else if(response_data_type_ == DataResponse_Reboot)
+					std::cout << "Steer Motor responsed the reboot command.\r\n";
 
             #else
 				if(2 == dataLength)//adcValue
@@ -359,7 +364,7 @@ bool SteerMotor::selfCheck()
 {
 	assert(is_read_serial_);
 	assert(is_request_state_);
-	int max_try_times = 10;
+	int max_try_times = 50;
 	std::cout << "SteerMotor is self checking..." << std::endl ;
 	while(max_try_times--)
 	{
@@ -403,13 +408,18 @@ float SteerMotor::getMotorSpeed() const
 	return motor_speed_;
 }
 
+#define STEER_MOTOR_OFFLINE 255
+#define STEER_ANGLE_SENSOR_ERROR 254
+
 uint8_t SteerMotor::getErrorMsg() const 
 {
 	//assert(is_request_state_);
 	uint64_t now = std::chrono::duration_cast<std::chrono::milliseconds>
 		(std::chrono::system_clock::now().time_since_epoch()).count();
 	if(now - last_active_time_ms_ > 200)
-		return 0xff; //离线
+		return STEER_MOTOR_OFFLINE; //离线
+	if(road_wheel_angle_ > 50 || road_wheel_angle_ < -50)
+		return STEER_ANGLE_SENSOR_ERROR;
 
 	return error_code_;
 }
@@ -602,16 +612,32 @@ uint16_t SteerMotor::generateModBusCRC_byTable(const uint8_t *ptr,uint8_t size)
     return CRC16;  
 }
 
+void SteerMotor::setSpeedAndAngle(float speed, float angle)
+{
+	if(speed > max_speed_) speed = max_speed_;
+	else if(speed < min_speed_) speed = min_speed_;
+
+	float angle_diff = angle - road_wheel_angle_;
+
+	if(angle_diff > max_road_wheel_angle_)
+		angle_diff = max_road_wheel_angle_;
+	else if(angle_diff < -max_road_wheel_angle_)
+		angle_diff = -max_road_wheel_angle_;
+	
+	this->rotate(angle_diff, speed);
+}
+
 void SteerMotor::setRoadWheelAngle(float angle)
 {
-    static uint8_t rotate_speed_min = 5;
-    static uint8_t rotate_speed_max = 40;
-    static float angle_diff_max = 40; //deg
-    
     float angle_diff = angle - road_wheel_angle_;
-    
+
+	if(angle_diff > max_road_wheel_angle_)
+		angle_diff = max_road_wheel_angle_;
+	else if(angle_diff < -max_road_wheel_angle_)
+		angle_diff = -max_road_wheel_angle_;
+	
     //根据角度偏差大小调节转速
-    uint8_t rotate_speed = fabs(angle_diff)/angle_diff_max *(rotate_speed_max-rotate_speed_min) + rotate_speed_min;
+    uint8_t rotate_speed = fabs(angle_diff)/max_road_wheel_angle_ *(max_speed_-min_speed_) + min_speed_;
     
     this->rotate(angle_diff, rotate_speed);
     
