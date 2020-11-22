@@ -73,6 +73,10 @@ bool Interface::init()
 	
 	can2serial_->configBaudrate(can_baudrate_);
 	can2serial_->clearCanFilter();
+	can2serial_->setCanFilter_alone(0x01,RECORD_PATH_CAN_ID);
+	can2serial_->setCanFilter_alone(0x02,RESET_CAN_ID);
+	can2serial_->setCanFilter_alone(0x03,DRIVERLESS_CAN_ID);
+	
 	can2serial_->StartReading();
 	
 	return true;
@@ -198,7 +202,7 @@ void Interface::readCanMsg()
 				break;
 			}
 			default:
-				ROS_ERROR("[%s] Unknown CAN ID.", __NAME__);
+				ROS_ERROR("[%s] Unknown CAN ID : 0x%02x", __NAME__, can_msg.ID);
 				break;
 		}
 	}

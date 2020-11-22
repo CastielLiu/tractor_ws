@@ -3,19 +3,20 @@
     <arg name="host_pc_port" value="/dev/host_pc"/>
     <arg name="gps_port" value="/dev/gps"/>
     <arg name="steering_port" value="/dev/steer_motor"/>
-    <arg name="gps_topic" value="/gps_odom"/>
+    <arg name="utm_topic" value="/gps_odom"/>
     <arg name="cmd_topic" value="/tractor_cmd"/>
     
     <!-- interface -->
 	<node name="interface_node" pkg="interface" type="interface_node" output="screen">
-	    <param name="utm_topic" value="$(arg gps_topic)"/>
+	    <param name="utm_topic" value="$(arg utm_topic)"/>
 		<param name="can2serial_port" value="$(arg host_pc_port)"/>
 		<param name="can_baudrate" value="250"/>
+		<param name="gps_topic" value="/gps" />
 	</node>
 	
 	<!-- auto_drive -->
 	<node name="auto_drive_node" pkg="auto_drive" type="auto_drive_node" output="screen">
-	    <param name="utm_topic" value="$(arg gps_topic)"/>  
+	    <param name="utm_topic" value="$(arg utm_topic)"/>  
 		<param name="path_file_dir" value="$(find auto_drive)/data/"/>
 		<param name="foreSightDis_speedCoefficient" value="1.8"/>
 		<param name="foreSightDis_speedCoefficient" value="1.8"/>
@@ -28,7 +29,7 @@
 	<!-- gps -->
 	<node name="nuogeng_node" pkg="nuogeng" type="nuogeng_node" output="screen">
 		<param name="port_name" value="$(arg gps_port)"/>
-		<param name="odom_topic" value="$(arg gps_topic)"/>
+		<param name="odom_topic" value="$(arg utm_topic)"/>
 		<param name="parent_frame_id" value="world"/>
 		<param name="child_frame_id" value="gps"/>
 		<param name="pub_odom" value="true"/>
