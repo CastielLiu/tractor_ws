@@ -31,9 +31,11 @@ class Interface
 	
   private:
 	void readCanMsg();
+	bool configCan2Serial();
 	void gps_callback(const gps_msgs::Inspvax::ConstPtr& msg);
 	void msgReport_callback(const ros::TimerEvent& event);
 	void heartbeat_callback(const ros::TimerEvent& event);
+	void uiHeartbeatOvertime_callback(const ros::TimerEvent& event);
 	void callServiceThread(const CanMsg_t& can_msg);
 
 	void path_tracking_info_callback(const driverless_msgs::PathTrackingInfo::ConstPtr& );
@@ -44,6 +46,8 @@ class Interface
 	Can2serial * can2serial_;
 	std::string can2serial_port_;
 	int can_baudrate_;
+	std::mutex can2serial_mutex_;
+	bool is_msg_reading_;
 
 	canMsgs_t can_pkgs_;
 	heartbeatStruct_t heart_beat_pkg_;
@@ -61,6 +65,9 @@ class Interface
 
 	ros::Timer msg_report_timer_;
 	ros::Timer heartbeat_timer_;
+	ros::Timer ui_heartbeat_timer_;
+	
+	std::atomic<double> last_ui_heatbeat_time_;
 	
 	boost::shared_ptr<boost::thread> read_canMsg_thread_;
 	
