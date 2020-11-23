@@ -56,11 +56,11 @@ class BaseControl
 	double lastBrakeValueTime_;
 	bool ignore_braker_error_;
 	bool ignore_steer_error_;
-	uint8_t brake_value_;
+	uint8_t brake_state_value_;
 };
 
 BaseControl::BaseControl():
-	brake_value_(0),
+	brake_state_value_(0),
 	lastBrakeValueTime_(0),
 	driverless_mode_(false)
 {
@@ -138,7 +138,7 @@ bool BaseControl::resetBrakeService(std_srvs::Empty::Request  &req,std_srvs::Emp
 
 void BaseControl::brakeSystem_callback(const std_msgs::UInt8::ConstPtr& state)
 {
-	brake_value_ = state->data;
+	brake_state_value_ = state->data;
 	lastBrakeValueTime_ = ros::Time::now().toSec();
 }
 
@@ -156,7 +156,7 @@ void BaseControl::publishState_callback(const ros::TimerEvent&)
 		state_.brakeError = state_.BRAKE_ERROR_OFFLINE;
 	else
 		state_.brakeError = state_.BRAKE_ERROR_NONE;
-	state_.brake_val = brake_value_;
+	state_.brake_val = brake_state_value_;
 
     pub_state_.publish(state_);
 }
@@ -185,8 +185,12 @@ void BaseControl::cmd_callback(const driverless_msgs::ControlCmd::ConstPtr& msg)
 	
 	//转发制动指令
 	std_msgs::UInt8 brakeVal;
-	brakeVal.data = msg->set_brake;
-	pub_brakeCmd_.publish(brakeVal);
+	
+	if(brake_state_value_ != msg->set_brake)
+	{
+		brakeVal.data = msg->set_brake;
+		pub_brakeCmd_.publish(brakeVal);
+	}
 }
 
 void BaseControl::steerDebug_callback(const driverless_msgs::SteerMotorDebug::ConstPtr& debug)

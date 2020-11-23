@@ -54,7 +54,7 @@ bool Interface::init()
 		
 	msg_report_timer_ = nh.createTimer(ros::Duration(0.5), &Interface::msgReport_callback,this);
 	heartbeat_timer_ = nh.createTimer(ros::Duration(0.5), &Interface::heartbeat_callback, this);
-	//ui_heartbeat_timer_=nh.createTimer(ros::Duration(5.0), &Interface::uiHeartbeatOvertime_callback, this);
+	ui_heartbeat_timer_=nh.createTimer(ros::Duration(5.0), &Interface::uiHeartbeatOvertime_callback, this);
 	
 	//创建路径记录服务客户端
 	client_recordPath_ = nh.serviceClient<interface::RecordPath>("record_path_service");
@@ -88,6 +88,7 @@ bool Interface::configCan2Serial()
 		
 	can2serial_ = new Can2serial;
 	
+	/*
 	ROS_INFO("[%s] start configure can serial port.", __NAME__);
 	if(!can2serial_->configure_port(can2serial_port_))
 	{
@@ -96,6 +97,14 @@ bool Interface::configCan2Serial()
 		can2serial_ = NULL;
 		return false;
 	}
+	*/
+
+	while(ros::ok() && !can2serial_->configure_port(can2serial_port_))
+	{
+		ROS_ERROR("[%s] Configure can2serial failed, try again...", __NAME__);
+		ros::Duration(1.0).sleep();
+	}
+
 	
 	ROS_INFO("[%s] configure can baud_rate, filter.", __NAME__);
 	can2serial_->configBaudrate(can_baudrate_);
