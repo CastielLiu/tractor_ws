@@ -204,7 +204,7 @@ void AutoDrive::autoDriveThread(float speed)
 		}
 		
 		pose_wr_mutex_.lock_shared();
-		bool update_state = tracker_.update(vehicle_speed_, roadwheel_angle_, pose_, avoid_offset_);
+		bool update_state = tracker_.update(vehicle_speed_, base_state_.roadWheelAngle, pose_, avoid_offset_);
 		pose_wr_mutex_.unlock_shared();
 
         if(!update_state) //更新失败,抵达目标地或出现异常

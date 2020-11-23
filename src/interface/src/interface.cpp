@@ -299,6 +299,11 @@ void Interface::baseControlState_callback(const driverless_msgs::BaseControlStat
 	heart_beat_pkg_.brakeSystemState = msg->brakeError;     //制动系统状态
 	heart_beat_pkg_.steerMotorState = msg->steerMotorError; //转向系统状态
 	heart_beat_pkg_mutex_.unlock();
+
+	if(msg->steerMotorError != 0)
+		ROS_ERROR("[%s] steerMotor error: code:  %d",__NAME__, msg->steerMotorError);
+	if(msg->brakeError != 0)
+		ROS_ERROR("[%s] brake system error: code:  %d",__NAME__, msg->brakeError);
 }
 
 //驾驶系统状态反馈
@@ -339,6 +344,7 @@ void Interface::heartbeat_callback(const ros::TimerEvent& event)
 	if(ros::Time::now().toSec() - last_gps_time_ > 0.3)
 	{
 		heart_beat_pkg_.gpsState = 1; //offline
+		ROS_ERROR("[%s] gps offline!", __NAME__);
 		gps_validity_ = false;
 	}
 	else

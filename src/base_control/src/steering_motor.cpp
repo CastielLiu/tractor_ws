@@ -249,8 +249,10 @@ void SteerMotor::BufferIncomingData(uint8_t *message, int length)
 					//std::cout << "road_wheel_angle_: " << road_wheel_angle_ << std::endl;
 				}
                 else if(response_data_type_ == DataResponse_EnableStatus)
+				{
                     is_enabled_ = (rawVal>0);
-                    
+					//std::cout << "steerMotor enable: " << int(is_enabled_) << "\r\n";
+				}   
                 else if(response_data_type_ == DataResponse_MotorSpeed)
                     motor_speed_ = rawVal;
                     
@@ -416,7 +418,7 @@ uint8_t SteerMotor::getErrorMsg() const
 	//assert(is_request_state_);
 	uint64_t now = std::chrono::duration_cast<std::chrono::milliseconds>
 		(std::chrono::system_clock::now().time_since_epoch()).count();
-	if(now - last_active_time_ms_ > 200)
+	if(now - last_active_time_ms_ > 1000)
 		return STEER_MOTOR_OFFLINE; //离线
 	if(road_wheel_angle_ > 50 || road_wheel_angle_ < -50)
 		return STEER_ANGLE_SENSOR_ERROR;

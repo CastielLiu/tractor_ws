@@ -112,7 +112,6 @@ bool BaseControl::init()
 		}
 		return false;
 	}
-	
     return true;
 }
 
@@ -131,10 +130,11 @@ bool BaseControl::clearSteerErrorService(std_srvs::Empty::Request  &req,std_srvs
 bool BaseControl::resetBrakeService(std_srvs::Empty::Request  &req,std_srvs::Empty::Response &res)
 {
 	ROS_INFO("[%s] Request reset the braker.", __NAME__);
-    
+    std_msgs::UInt8 brakeVal;
+	brakeVal.data = 0;
+	pub_brakeCmd_.publish(brakeVal);
 	return true;
 }
-
 
 void BaseControl::brakeSystem_callback(const std_msgs::UInt8::ConstPtr& state)
 {
@@ -148,16 +148,15 @@ void BaseControl::publishState_callback(const ros::TimerEvent&)
   	state_.roadWheelAngle = steerMotor_.getRoadWheelAngle();
     state_.motorSpeed = steerMotor_.getMotorSpeed();
     state_.steerMotorEnabled = steerMotor_.is_enabled();
-    state_.steerMotorError = steerMotor_.getErrorMsg();
+    state_.steerMotorError = 0; //steerMotor_.getErrorMsg();
 
 	//制动系统状态反馈
-	if(ros::Time::now().toSec() - lastBrakeValueTime_ > 0.5 && //制动系统状态反馈超时
-		!ignore_braker_error_) 
+	if(ros::Time::now().toSec() - lastBrakeValueTime_ > 1.0 && //制动系统状态反馈超时
+		!ignore_braker_error_)
 		state_.brakeError = state_.BRAKE_ERROR_OFFLINE;
 	else
 		state_.brakeError = state_.BRAKE_ERROR_NONE;
 	state_.brake_val = brake_state_value_;
-
     pub_state_.publish(state_);
 }
 
@@ -165,7 +164,7 @@ void BaseControl::cmd_callback(const driverless_msgs::ControlCmd::ConstPtr& msg)
 {
 	static int try_disable_motor_cnt = 0;
 	if(!msg->driverless_mode && driverless_mode_) //上次处于自动驾驶模式，当前请求关闭
-		try_disable_motor_cnt = 5;
+		try_disable_motor_cnt = 50;
 	
 	if(!msg->driverless_mode)
 	{
@@ -183,11 +182,10 @@ void BaseControl::cmd_callback(const driverless_msgs::ControlCmd::ConstPtr& msg)
 
 	driverless_mode_ = msg->driverless_mode;
 	
-	//转发制动指令
-	std_msgs::UInt8 brakeVal;
-	
 	if(brake_state_value_ != msg->set_brake)
 	{
+		//转发制动指令
+		std_msgs::UInt8 brakeVal;
 		brakeVal.data = msg->set_brake;
 		pub_brakeCmd_.publish(brakeVal);
 	}
