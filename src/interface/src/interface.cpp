@@ -101,6 +101,8 @@ bool Interface::configCan2Serial()
 	can2serial_->setCanFilter_alone(0x01,REQUEST_RECORD_PATH_CAN_ID);
 	can2serial_->setCanFilter_alone(0x02,REQUEST_RESET_CAN_ID);
 	can2serial_->setCanFilter_alone(0x03,REQUEST_DRIVERLESS_CAN_ID);
+	can2serial_->setCanFilter_alone(0x04,UI_HEARTBEAT_CAN_ID);
+	
 	
 	ROS_INFO("[%s] start read pkg from buffer.", __NAME__);
 	can2serial_->StartReading();
@@ -145,7 +147,11 @@ void Interface::callServiceThread(const CanMsg_t& can_msg)
 							srv_record_path.request.path_file_name.c_str(),
 							srv_record_path.request.path_type,
 							srv_record_path.request.command_type);
-							
+
+		can_pkgs_.response.data[0] = 0x02; //universal response
+		can_pkgs_.response.data[1] = 0xff; //request received.
+		can2serial_->sendCanMsg(can_pkgs_.response); //response
+
 		client_recordPath_.call(srv_record_path);
 		can_pkgs_.response.data[0] = 0x00;//response record path
 		can_pkgs_.response.data[1] = srv_record_path.response.success;
@@ -174,7 +180,12 @@ void Interface::callServiceThread(const CanMsg_t& can_msg)
 		ROS_INFO("[%s] Request auto drive:%s\t type:%d\t cmd:%d",__NAME__,
 							srv_driverless.request.path_file_name.c_str(),
 							srv_driverless.request.path_type,
-							srv_driverless.request.command_type);              
+							srv_driverless.request.command_type);  
+
+		can_pkgs_.response.data[0] = 0x02; //universal response
+		can_pkgs_.response.data[1] = 0xff; //request received.
+		can2serial_->sendCanMsg(can_pkgs_.response); //response
+
 		client_driverless_.call(srv_driverless);
 		can_pkgs_.response.data[0] = 0x01;//response driverless
 		can_pkgs_.response.data[1] = srv_driverless.response.success;
@@ -185,6 +196,10 @@ void Interface::callServiceThread(const CanMsg_t& can_msg)
 	}
 	else if(can_msg.ID == REQUEST_RESET_CAN_ID) //系统复位
 	{
+		can_pkgs_.response.data[0] = 0x02; //universal response
+		can_pkgs_.response.data[1] = 0xff; //request received.
+		can2serial_->sendCanMsg(can_pkgs_.response); //response
+
 		systemResetMsg_t *resetMsg = (systemResetMsg_t *)can_msg.data;
 		std_srvs::Empty empty;
 		if(resetMsg->clearMotorError) //清除转向电机错误标志
@@ -207,7 +222,7 @@ void Interface::callServiceThread(const CanMsg_t& can_msg)
 void Interface::uiHeartbeatOvertime_callback(const ros::TimerEvent& event)
 {
 	if(
-	//ros::Time::now().toSec() - last_ui_heatbeat_time_ > 5.0 || //上位机心跳超时，可能can模块故障
+	ros::Time::now().toSec() - last_ui_heatbeat_time_ > 3.0 || //上位机心跳超时，可能can模块故障
 	!can2serial_->isRunning()) //USB松动导致读取/发送异常
 	{
 		ROS_INFO("[%s] relaunch can2serial...", __NAME__);
