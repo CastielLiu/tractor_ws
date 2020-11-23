@@ -96,7 +96,7 @@ bool PathTracking::extendGlobalPath(float extendDis)
 	//std::cout << "extendGlobalPath: " << path_.points.size() << "\t" << path_.points.size()-1 << std::endl;
 	if(path_.points.size()-1 < n)
 	{
-		ROS_ERROR("[%s] global path points is too few (%d), extend global path failed",path_.points.size()-1, __NAME__);
+		ROS_ERROR("[%s] global path points is too few (%lu), extend global path failed", __NAME__, path_.points.size()-1);
 		return false;
 	}
 	int endIndex = path_.points.size()-1;
@@ -138,8 +138,8 @@ bool PathTracking::update(float speed, float road_wheelangle,  //vehicle state
 	
 	lateral_err_ = lateral_err_ - path_offset; 
 
-
-	disThreshold_ = foreSightDis_latErrCoefficient_ * fabs(lateral_err_) + min_foresight_distance_; 
+	//disThreshold_ = foreSightDis_latErrCoefficient_ * fabs(lateral_err_) + min_foresight_distance_;
+	disThreshold_ = min_foresight_distance_;  
 
 	if( path_offset != 0.0)
 		target_point_ = pointOffset(target_point_, path_offset);

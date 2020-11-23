@@ -148,7 +148,11 @@ void BaseControl::publishState_callback(const ros::TimerEvent&)
   	state_.roadWheelAngle = steerMotor_.getRoadWheelAngle();
     state_.motorSpeed = steerMotor_.getMotorSpeed();
     state_.steerMotorEnabled = steerMotor_.is_enabled();
-    state_.steerMotorError = 0; //steerMotor_.getErrorMsg();
+
+	if(ignore_steer_error_)
+    	state_.steerMotorError = 0; //steerMotor_.getErrorMsg();
+	else
+		state_.steerMotorError = steerMotor_.getErrorMsg();
 
 	//制动系统状态反馈
 	if(ros::Time::now().toSec() - lastBrakeValueTime_ > 1.0 && //制动系统状态反馈超时
