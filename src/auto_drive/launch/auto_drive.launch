@@ -7,7 +7,7 @@
     <arg name="cmd_topic" value="/tractor_cmd"/>
     
     <!-- interface -->
-	<node name="interface_node" pkg="interface" type="interface_node" output="screen">
+	<node name="interface_node" pkg="interface" type="interface_node" output="screen" respawn="true">
 	    <param name="utm_topic" value="$(arg utm_topic)"/>
 		<param name="can2serial_port" value="$(arg host_pc_port)"/>
 		<param name="can_baudrate" value="250"/>
@@ -15,7 +15,7 @@
 	</node>
 	
 	<!-- auto_drive -->
-	<node name="auto_drive_node" pkg="auto_drive" type="auto_drive_node" output="screen">
+	<node name="auto_drive_node" pkg="auto_drive" type="auto_drive_node" output="screen" respawn="true">
 	    <param name="utm_topic" value="$(arg utm_topic)"/>  
 		<param name="path_file_dir" value="$(find auto_drive)/data/"/>
 		<param name="foreSightDis_speedCoefficient" value="1.8"/>
@@ -27,7 +27,7 @@
 	</node>
 	
 	<!-- gps -->
-	<node name="nuogeng_node" pkg="nuogeng" type="nuogeng_node" output="screen">
+	<node name="nuogeng_node" pkg="nuogeng" type="nuogeng_node" output="screen" respawn="true">
 		<param name="port_name" value="$(arg gps_port)"/>
 		<param name="odom_topic" value="$(arg utm_topic)"/>
 		<param name="parent_frame_id" value="world"/>
@@ -39,7 +39,7 @@
 	<!-- node name="base_gps_tf" pkg="tf" type="static_transform_publisher" args="0 0 0 0 0 0 base_link gps 50"/-->
 	
 	<!--base_control-->
-	<node name="base_control_node" pkg="base_control" type="base_control_node" required="true" output="screen">
+	<node name="base_control_node" pkg="base_control" type="base_control_node" output="screen" respawn="true">
 		<param name="steering_port" value="$(arg steering_port)"/>
 		<param name="road_wheel_angle_offset" value="-83.5"/>
 		<param name="road_wheel_angle_resolution" value="0.04"/> <!--1 adc 对应的角度值 -->
@@ -51,7 +51,7 @@
 		<!--remap from="/brake_cmd" to="/none_topic"/-->
 	</node>
 	
-	<node name="arduino_brake_node" pkg="rosserial_python" type="serial_node.py" args="_port:=/dev/ttyACM0"  output="screen">
+	<node name="arduino_brake_node" pkg="rosserial_python" type="serial_node.py" args="_port:=/dev/ttyACM0"  output="screen" respawn="true">
 	</node>
 
 	<!--node name="rviz" pkg="rviz" type="rviz" args="-d $(find auto_drive)/rviz/auto_drive.rviz"/-->

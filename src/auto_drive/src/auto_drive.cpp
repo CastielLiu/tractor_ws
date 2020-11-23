@@ -43,7 +43,7 @@ bool AutoDrive::init()
     pub_cmd_ = nh_.advertise<driverless_msgs::ControlCmd>(cmd_topic, 1);
 	pub_state_ = nh_.advertise<std_msgs::UInt8>("/system_state", 1); //发布系统状态
 
-	update_timer_ = nh_.createTimer(ros::Duration(0.05),&AutoDrive::update_timer_callback,this); //控制指令发布定时器
+	update_timer_ = nh_.createTimer(ros::Duration(0.02),&AutoDrive::update_timer_callback,this); //控制指令发布定时器
 
     srv_driverless_   = nh_.advertiseService("driverless_service", &AutoDrive::driverlessService, this);
 	srv_recorder_     = nh_.advertiseService("record_path_service",&AutoDrive::recordPathService, this);

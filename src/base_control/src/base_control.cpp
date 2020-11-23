@@ -60,7 +60,7 @@ class BaseControl
 };
 
 BaseControl::BaseControl():
-	brake_state_value_(0),
+	brake_state_value_(5),
 	lastBrakeValueTime_(0),
 	driverless_mode_(false)
 {

@@ -218,7 +218,8 @@ void Interface::callServiceThread(const CanMsg_t& can_msg)
 
 void Interface::uiHeartbeatOvertime_callback(const ros::TimerEvent& event)
 {
-	if(ros::Time::now().toSec() - last_ui_heatbeat_time_ > 5.0 ||
+	if(
+		//ros::Time::now().toSec() - last_ui_heatbeat_time_ > 5.0 ||
 		!can2serial_->isRunning())
 	{
 		//接收ui心跳超时，can模块可能处于异常状态，重启can模块
