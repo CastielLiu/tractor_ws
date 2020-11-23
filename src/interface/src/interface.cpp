@@ -73,39 +73,28 @@ bool Interface::init()
 bool Interface::configCan2Serial()
 {
 	is_msg_reading_ = false;
-	ros::Duration(0.5).sleep(); //等待读取线程退出
-	
-	std::unique_lock<std::mutex> lock(can2serial_mutex_);
+	std::lock_guard<std::mutex> lck(msg_reading_mutex_); //锁定读取线程
 	
 	ROS_INFO("[%s] start configCan2Serial.", __NAME__);
 	
-	if(can2serial_!=NULL)
+	if(can2serial_ != NULL)
 	{
 		ROS_INFO("[%s] stop history reading thread .", __NAME__);
 		can2serial_->StopReading();
-		delete can2serial_;
 	}
-		
-	can2serial_ = new Can2serial;
-	
-	/*
-	ROS_INFO("[%s] start configure can serial port.", __NAME__);
-	if(!can2serial_->configure_port(can2serial_port_))
-	{
-		ROS_ERROR("[%s] Configure can2serial failed!", __NAME__);
-		delete can2serial_;
-		can2serial_ = NULL;
-		return false;
-	}
-	*/
+	else	
+		can2serial_ = new Can2serial;
 
+	ROS_INFO("[%s] start configure can serial port.", __NAME__);
+	int try_cnt = 0, max_try_cnt = 5;
 	while(ros::ok() && !can2serial_->configure_port(can2serial_port_))
 	{
-		ROS_ERROR("[%s] Configure can2serial failed, try again...", __NAME__);
+		ROS_ERROR("[%s] %d/%d Try configure can2serial failed.", __NAME__, ++try_cnt, max_try_cnt);
+		if(try_cnt >= max_try_cnt)
+			return false;
 		ros::Duration(1.0).sleep();
 	}
 
-	
 	ROS_INFO("[%s] configure can baud_rate, filter.", __NAME__);
 	can2serial_->configBaudrate(can_baudrate_);
 	//can2serial_->clearCanFilter();
@@ -120,7 +109,7 @@ bool Interface::configCan2Serial()
 	ROS_INFO("[%s] start read can msgs thread.", __NAME__);
 	std::thread t(&Interface::readCanMsg, this);
 	t.detach();
-		
+
 	return true;
 }
 
@@ -132,7 +121,6 @@ void Interface::callServiceThread(const CanMsg_t& can_msg)
 	{
 		can_pkgs_.response.data[0] = 0x02; //通用应答
 		can_pkgs_.response.data[1] = 0x00; //系统正忙
-		std::unique_lock<std::mutex> lock(can2serial_mutex_);
 		can2serial_->sendCanMsg(can_pkgs_.response);
 		return;
 	}
@@ -164,7 +152,6 @@ void Interface::callServiceThread(const CanMsg_t& can_msg)
 		can_pkgs_.response.data[2] = srv_record_path.response.point_cnt%256;
 		can_pkgs_.response.data[3] = srv_record_path.response.point_cnt/256;
 		
-		std::unique_lock<std::mutex> lock(can2serial_mutex_);
 		can2serial_->sendCanMsg(can_pkgs_.response); //response
 		//can2serial_->showCanMsg(can_msg, "request record path");
 		can2serial_->showCanMsg(can_pkgs_.response, "response record path");
@@ -192,9 +179,7 @@ void Interface::callServiceThread(const CanMsg_t& can_msg)
 		can_pkgs_.response.data[0] = 0x01;//response driverless
 		can_pkgs_.response.data[1] = srv_driverless.response.success;
 		
-		std::unique_lock<std::mutex> lock(can2serial_mutex_);
 		can2serial_->sendCanMsg(can_pkgs_.response); //response
-
 		//can2serial_->showCanMsg(can_msg, "request diverless");
 		can2serial_->showCanMsg(can_pkgs_.response, "response diverless");
 	}
@@ -209,22 +194,24 @@ void Interface::callServiceThread(const CanMsg_t& can_msg)
 		if(resetMsg->brakeReset)  //复位制动执行器
 			client_resetBraker_.call(empty);
 		
-		std::unique_lock<std::mutex> lock(can2serial_mutex_);
 		can2serial_->showCanMsg(can_msg, "request reset");
 	}
 
 	threadIsRunning = false;
 }
 
+/*can2serial 定时状态检查，如果出现异常，尝试重新配置
+	异常情况1: 长时间没有收到界面心跳包(can2serial可能初始化未成功)
+	异常情况2: USB松动出现读取/发送异常
+ */
 void Interface::uiHeartbeatOvertime_callback(const ros::TimerEvent& event)
 {
 	if(
-		//ros::Time::now().toSec() - last_ui_heatbeat_time_ > 5.0 ||
-		!can2serial_->isRunning())
+	//ros::Time::now().toSec() - last_ui_heatbeat_time_ > 5.0 || //上位机心跳超时，可能can模块故障
+	!can2serial_->isRunning()) //USB松动导致读取/发送异常
 	{
-		//接收ui心跳超时，can模块可能处于异常状态，重启can模块
 		ROS_INFO("[%s] relaunch can2serial...", __NAME__);
-		this->configCan2Serial();
+		this->configCan2Serial(); //重启can模块
 	}
 }
 
@@ -232,6 +219,7 @@ void Interface::readCanMsg()
 {
 	CanMsg_t can_msg;
 	is_msg_reading_ = true;
+	std::lock_guard<std::mutex> lck(msg_reading_mutex_);
 	
 	while(ros::ok() && is_msg_reading_)
 	{
@@ -244,15 +232,15 @@ void Interface::readCanMsg()
 		switch(can_msg.ID)
 		{
 			case REQUEST_RECORD_PATH_CAN_ID: //记录路径相关can消息
-			case REQUEST_DRIVERLESS_CAN_ID://请求自动驾驶相关can消息
-			case REQUEST_RESET_CAN_ID: //系统复位
+			case REQUEST_DRIVERLESS_CAN_ID:  //请求自动驾驶相关can消息
+			case REQUEST_RESET_CAN_ID:       //系统复位
 			{
 				//使用新线程调用服务器，避免阻塞
 				std::thread t(&Interface::callServiceThread, this, can_msg);
 				t.detach(); //防止线程句柄释放导致线程意外退出
 				break;
 			}
-			case UI_HEARTBEAT_CAN_ID: //UI界面心跳包
+			case UI_HEARTBEAT_CAN_ID: //上位机UI界面心跳包
 				last_ui_heatbeat_time_ = ros::Time::now().toSec();
 			
 			default:
@@ -292,37 +280,12 @@ void Interface::path_tracking_info_callback(const driverless_msgs::PathTrackingI
 	can_pkgs_.gpsMsg.data[5] = lateral_err/2;
 }
 
-//底层控制状态反馈
-void Interface::baseControlState_callback(const driverless_msgs::BaseControlState::ConstPtr& msg)
-{
-	heart_beat_pkg_mutex_.lock();
-	heart_beat_pkg_.brakeSystemState = msg->brakeError;     //制动系统状态
-	heart_beat_pkg_.steerMotorState = msg->steerMotorError; //转向系统状态
-	heart_beat_pkg_mutex_.unlock();
-
-	if(msg->steerMotorError != 0)
-		ROS_ERROR("[%s] steerMotor error: code:  %d",__NAME__, msg->steerMotorError);
-	if(msg->brakeError != 0)
-		ROS_ERROR("[%s] brake system error: code:  %d",__NAME__, msg->brakeError);
-}
-
-//驾驶系统状态反馈
-void Interface::driveSystemState_callback(const std_msgs::UInt8::ConstPtr& msg)
-{
-	heart_beat_pkg_mutex_.lock();
-	heart_beat_pkg_.driveSystemState = msg->data;
-	heart_beat_pkg_mutex_.unlock();
-}
-
-
 //状态数据定时上报
 void Interface::msgReport_callback(const ros::TimerEvent& event)
 {
 	if(gps_validity_)
 	{
-		can2serial_mutex_.lock();
 		can2serial_->sendCanMsg(can_pkgs_.gpsPos);
-		can2serial_mutex_.unlock();
 //		can2serial_->showCanMsg(can_pkgs_.gpsPos);
 		usleep(1000);
 	}
@@ -332,7 +295,6 @@ void Interface::msgReport_callback(const ros::TimerEvent& event)
 		can_pkgs_.gpsMsg.data[4] |= lateral_err%2 << 7;
 		can_pkgs_.gpsMsg.data[5] = lateral_err/2;
 	}
-	std::unique_lock<std::mutex> lock(can2serial_mutex_);
 	can2serial_->sendCanMsg(can_pkgs_.gpsMsg);
 	//can2serial_->showCanMsg(can_pkgs_.gpsMsg);
 }
@@ -340,7 +302,7 @@ void Interface::msgReport_callback(const ros::TimerEvent& event)
 //发送心跳包
 void Interface::heartbeat_callback(const ros::TimerEvent& event)
 {
-	heart_beat_pkg_mutex_.lock();
+	std::lock_guard<std::mutex> lck(heart_beat_pkg_mutex_);
 	if(ros::Time::now().toSec() - last_gps_time_ > 0.3)
 	{
 		heart_beat_pkg_.gpsState = 1; //offline
@@ -355,10 +317,30 @@ void Interface::heartbeat_callback(const ros::TimerEvent& event)
 
 	memcpy(can_pkgs_.heartbeat.data, &heart_beat_pkg_, sizeof(heart_beat_pkg_));
 	
-	std::unique_lock<std::mutex> lock(can2serial_mutex_);
 	can2serial_->sendCanMsg(can_pkgs_.heartbeat);
 	//can2serial_->showCanMsg(can_pkgs_.heartbeat);
+}
+
+//驾驶系统状态反馈
+void Interface::driveSystemState_callback(const std_msgs::UInt8::ConstPtr& msg)
+{
+	heart_beat_pkg_mutex_.lock();
+	heart_beat_pkg_.driveSystemState = msg->data;
 	heart_beat_pkg_mutex_.unlock();
+}
+
+//底层控制状态反馈
+void Interface::baseControlState_callback(const driverless_msgs::BaseControlState::ConstPtr& msg)
+{
+	heart_beat_pkg_mutex_.lock();
+	heart_beat_pkg_.brakeSystemState = msg->brakeError;     //制动系统状态
+	heart_beat_pkg_.steerMotorState = msg->steerMotorError; //转向系统状态
+	heart_beat_pkg_mutex_.unlock();
+
+	if(msg->steerMotorError != 0)
+		ROS_ERROR("[%s] steerMotor error: code:  %d",__NAME__, msg->steerMotorError);
+	if(msg->brakeError != 0)
+		ROS_ERROR("[%s] brake system error: code:  %d",__NAME__, msg->brakeError);
 }
 
 int main(int argc,char** argv)

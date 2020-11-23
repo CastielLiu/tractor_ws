@@ -46,7 +46,7 @@ class Interface
 	Can2serial * can2serial_;
 	std::string can2serial_port_;
 	int can_baudrate_;
-	std::mutex can2serial_mutex_;
+	std::mutex msg_reading_mutex_;
 	bool is_msg_reading_;
 
 	canMsgs_t can_pkgs_;
