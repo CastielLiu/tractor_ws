@@ -257,6 +257,7 @@ void Interface::readCanMsg()
 			}
 			case UI_HEARTBEAT_CAN_ID: //上位机UI界面心跳包
 				last_ui_heatbeat_time_ = ros::Time::now().toSec();
+				ROS_INFO("[%s] Received UI heart beat.",__NAME__);
 			
 			default:
 				ROS_ERROR("[%s] Unknown CAN ID : 0x%02x", __NAME__, can_msg.ID);

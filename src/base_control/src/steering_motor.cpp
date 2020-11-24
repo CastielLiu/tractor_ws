@@ -26,7 +26,6 @@ static const uint16_t CRC16Table[]={
 //不使用线程同步时，通过返回数据长度进行判断
 #define USE_THREAD_SYNCHRONIZE 1
 
-
 #define MAX_LOAD_SIZE 100
 static uint8_t raw_buffer[MAX_LOAD_SIZE];
 
@@ -619,24 +618,22 @@ void SteerMotor::setSpeedAndAngle(float speed, float angle)
 	if(speed > max_speed_) speed = max_speed_;
 	else if(speed < min_speed_) speed = min_speed_;
 
-	float angle_diff = angle - road_wheel_angle_;
-
-	if(angle_diff > max_road_wheel_angle_)
-		angle_diff = max_road_wheel_angle_;
-	else if(angle_diff < -max_road_wheel_angle_)
-		angle_diff = -max_road_wheel_angle_;
+	if(angle > max_road_wheel_angle_)
+		angle = max_road_wheel_angle_;
+	else if(angle < -max_road_wheel_angle_)
+		angle = -max_road_wheel_angle_;
+    float angle_diff = angle - road_wheel_angle_;
 	
 	this->rotate(angle_diff, speed);
 }
 
 void SteerMotor::setRoadWheelAngle(float angle)
 {
+	if(angle > max_road_wheel_angle_)
+		angle = max_road_wheel_angle_;
+	else if(angle < -max_road_wheel_angle_)
+		angle = -max_road_wheel_angle_;
     float angle_diff = angle - road_wheel_angle_;
-
-	if(angle_diff > max_road_wheel_angle_)
-		angle_diff = max_road_wheel_angle_;
-	else if(angle_diff < -max_road_wheel_angle_)
-		angle_diff = -max_road_wheel_angle_;
 	
     //根据角度偏差大小调节转速
     uint8_t rotate_speed = fabs(angle_diff)/max_road_wheel_angle_ *(max_speed_-min_speed_) + min_speed_;

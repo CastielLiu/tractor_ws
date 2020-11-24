@@ -98,6 +98,10 @@ bool BaseControl::init()
  	float road_wheel_angle_resolution = nh_private.param<float>("road_wheel_angle_resolution",180.0/4096);
 	steerMotor_.setRoadWheelAngleOffset(road_wheel_angle_offset);
 	steerMotor_.setRoadWheelAngleResolution(road_wheel_angle_resolution);
+	steerMotor_.setMaxRoadWheelAngle(nh_private.param<float>("max_road_wheel_angle",35));
+	float max_steer_rotate_speed = nh_private.param<float>("max_steer_rotate_speed",100);
+	float min_steer_rotate_speed = nh_private.param<float>("min_steer_rotate_speed",10);
+	steerMotor_.setRotateSpeedRange(min_steer_rotate_speed, max_steer_rotate_speed);
 
 	ignore_steer_error_ = nh_private.param<bool>("ignore_steer_error", false);
 	ignore_braker_error_ = nh_private.param<bool>("ignore_braker_error", false);
@@ -132,7 +136,10 @@ bool BaseControl::resetBrakeService(std_srvs::Empty::Request  &req,std_srvs::Emp
 	ROS_INFO("[%s] Request reset the braker.", __NAME__);
     std_msgs::UInt8 brakeVal;
 	brakeVal.data = 0;
-	pub_brakeCmd_.publish(brakeVal);
+	for(int i=0; i<20; ++i){
+		pub_brakeCmd_.publish(brakeVal);
+		ros::Duration(0.02).sleep();
+	}
 	return true;
 }
 

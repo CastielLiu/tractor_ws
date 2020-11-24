@@ -36,6 +36,13 @@ class SteerMotor
 	
 	void setRoadWheelAngleResolution(float val){road_wheel_angle_resolution_ = val;}
 	void setRoadWheelAngleOffset(float offset){road_wheel_angle_offset_ = offset;}
+	void setMaxRoadWheelAngle(float val){max_road_wheel_angle_ = val;}
+	void setRotateSpeedRange(float min, float max)
+	{
+		assert(max > min);
+		max_speed_ = max;
+		min_speed_ = min;
+	}
   private:
   	void stopReadSerial();
 	void startReadSerial();
@@ -89,8 +96,8 @@ class SteerMotor
 	std::mutex read_serial_thread_mutex_;
 	std::mutex request_state_thread_mutex_;
 	
-	const int max_speed_, min_speed_;  //转向电机的最大最小转向速度
-	const float max_road_wheel_angle_; //最大的前轮转角
+	int max_speed_, min_speed_;  //转向电机的最大最小转向速度
+	float max_road_wheel_angle_; //最大的前轮转角
 
 	float road_wheel_angle_;
 	float road_wheel_angle_resolution_;
