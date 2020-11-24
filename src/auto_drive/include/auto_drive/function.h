@@ -15,9 +15,10 @@ float calculateDis2path(const double& x,const double& y,
 						 size_t& nearest_point_index);
 
 float calculateDis2path2(const double& x,const double& y,
-						 const std::vector<gpsMsg_t>& path_points, 
-						 size_t  ref_point_index, //参考点索引
-						 size_t  max_search_index);
+						 const path_t& path_points, 
+						 size_t  start_index, //参考点索引
+						 size_t  end_index,
+						 size_t& nearest_point_index);
 
 bool is_gps_data_valid(gpsMsg_t& point);
 

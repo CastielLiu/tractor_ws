@@ -23,7 +23,22 @@ void PathTracking::publishGlobalPath(const path_t& path)
 	if(path.size() == 0)
 		return;
 
-	global_path_.header.frame_id = "world";
+	geometry_msgs::TransformStamped transformStamped;
+	transformStamped.header.stamp = ros::Time::now();
+	transformStamped.header.frame_id = "start";
+	transformStamped.child_frame_id = "gps";
+	transformStamped.transform.translation.x = current_pos_.x - path[0].x;
+	transformStamped.transform.translation.y = current_pos_.y - path[0].y;
+	transformStamped.transform.translation.z = 0.0;
+
+	transformStamped.transform.rotation.x = 0; // quat.x();
+	transformStamped.transform.rotation.y = 0; //quat.y();
+	transformStamped.transform.rotation.z = 0; //quat.z();
+	transformStamped.transform.rotation.w = 1; //quat.w();
+	tf_br_.sendTransform(transformStamped);
+
+
+	global_path_.header.frame_id = "start";
 	global_path_.header.stamp = ros::Time::now();
 
 	if(!is_new_task_)
@@ -44,10 +59,10 @@ void PathTracking::publishGlobalPath(const path_t& path)
 	for(const gpsMsg_t point:(*points_ptr))
 	{
 		geometry_msgs::PoseStamped pose;
-		pose.pose.position.x = point.x;
-		pose.pose.position.y = point.y;
+		pose.pose.position.x = point.x - path[0].x;;
+		pose.pose.position.y = point.y - path[0].y;;
 		pose.header.stamp = global_path_.header.stamp;
-		pose.header.frame_id="world";
+		pose.header.frame_id="start";
 		global_path_.poses.push_back(pose);
 	}
 	pub_global_path_.publish(global_path_);
@@ -81,7 +96,7 @@ bool PathTracking::init(const gpsMsg_t& vehicle_point)
 
 	pub_info_ = nh_.advertise<driverless_msgs::PathTrackingInfo>("/tracking_info",1);
 	pub_global_path_ = nh_.advertise<nav_msgs::Path>("/global_path",1);
-	pub_global_path_timer_ = nh_.createTimer(ros::Duration(3.0), &PathTracking::pubGlobalPathTimerCallback, this);
+	pub_global_path_timer_ = nh_.createTimer(ros::Duration(0.3), &PathTracking::pubGlobalPathTimerCallback, this);
 
 	target_point_index_ = nearest_point_index_;
 	return true;
@@ -134,11 +149,6 @@ bool PathTracking::update(float speed, float road_wheelangle,  //vehicle state
 	road_wheelangle_ = road_wheelangle;
 
 	target_point_ = path_.points[target_point_index_];
-	
-	lateral_err_ = calculateDis2path(vehicle_point.x, vehicle_point.y, path_, nearest_point_index_, //input
-					            nearest_point_index_); //output
-	
-	lateral_err_ = lateral_err_ - path_offset; 
 
 	//disThreshold_ = foreSightDis_latErrCoefficient_ * fabs(lateral_err_) + min_foresight_distance_;
 	disThreshold_ = min_foresight_distance_;  
@@ -148,10 +158,17 @@ bool PathTracking::update(float speed, float road_wheelangle,  //vehicle state
 
 	std::pair<float, float> dis_yaw = get_dis_yaw(target_point_, vehicle_point);
 
-	if( dis_yaw.first < disThreshold_)
+	while( dis_yaw.first < disThreshold_)
 	{
-		++target_point_index_;
+		target_point_ = path_.points[++target_point_index_];
+
+		dis_yaw = get_dis_yaw(target_point_, vehicle_point);
 	}
+
+	lateral_err_ = calculateDis2path2(vehicle_point.x, vehicle_point.y, path_, nearest_point_index_, target_point_index_,//input
+					            nearest_point_index_); //output
+	lateral_err_ = lateral_err_ - path_offset; 
+
 	float yaw_err = dis_yaw.second - vehicle_point.yaw;
 	
 	if(yaw_err==0.0)

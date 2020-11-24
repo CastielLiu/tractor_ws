@@ -149,7 +149,7 @@ void Interface::callServiceThread(const CanMsg_t& can_msg)
 							srv_record_path.request.command_type);
 
 		can_pkgs_.response.data[0] = 0x02; //universal response
-		can_pkgs_.response.data[1] = 0xff; //request received.
+		//can_pkgs_.response.data[1] = 0xff; //request received.
 		can2serial_->sendCanMsg(can_pkgs_.response); //response
 
 		client_recordPath_.call(srv_record_path);
@@ -184,7 +184,7 @@ void Interface::callServiceThread(const CanMsg_t& can_msg)
 
 		can_pkgs_.response.data[0] = 0x02; //universal response
 		can_pkgs_.response.data[1] = 0xff; //request received.
-		can2serial_->sendCanMsg(can_pkgs_.response); //response
+		//can2serial_->sendCanMsg(can_pkgs_.response); //response
 
 		client_driverless_.call(srv_driverless);
 		can_pkgs_.response.data[0] = 0x01;//response driverless
@@ -198,7 +198,7 @@ void Interface::callServiceThread(const CanMsg_t& can_msg)
 	{
 		can_pkgs_.response.data[0] = 0x02; //universal response
 		can_pkgs_.response.data[1] = 0xff; //request received.
-		can2serial_->sendCanMsg(can_pkgs_.response); //response
+		//can2serial_->sendCanMsg(can_pkgs_.response); //response
 
 		systemResetMsg_t *resetMsg = (systemResetMsg_t *)can_msg.data;
 		std_srvs::Empty empty;

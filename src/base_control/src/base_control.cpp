@@ -109,11 +109,11 @@ bool BaseControl::init()
 	if(!steerMotor_.init(steerMotor_port_name_,115200))
 	{
 	    ROS_ERROR("[%s] init steering motor failed.", __NAME__);
-		if(ignore_steer_error_) //debug mode
+		/*if(ignore_steer_error_) //debug mode
 		{
 			ROS_ERROR("[%s] sytem ignore init steering motor failed.", __NAME__);
 			return true;
-		}
+		}*/
 		return false;
 	}
     return true;
@@ -199,6 +199,10 @@ void BaseControl::cmd_callback(const driverless_msgs::ControlCmd::ConstPtr& msg)
 		std_msgs::UInt8 brakeVal;
 		brakeVal.data = msg->set_brake;
 		pub_brakeCmd_.publish(brakeVal);
+	}
+	else
+	{
+		ROS_INFO("[%s] brake_state: %d  expect_state: %d", __NAME__, brake_state_value_ ,msg->set_brake);
 	}
 }
 

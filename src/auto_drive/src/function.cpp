@@ -76,74 +76,29 @@ float calculateDis2path(const double& x,const double& y,
  *@param max_search_index 最大搜索索引,超出此索引的目标物则输出距离为FLT_MAX
  */
 float calculateDis2path2(const double& x,const double& y,
-						 const std::vector<gpsMsg_t>& path_points, 
-						 size_t  ref_point_index, //参考点索引
-						 size_t  max_search_index)
+						 const path_t& path_points, 
+						 size_t  start_index, //参考点索引
+						 size_t  end_index,
+						 size_t& nearest_point_index)
 {
-	int searchDir; //搜索方向 -1:向后搜索， 1：向前搜索， 0 搜索完毕
-	if(ref_point_index == 0)
+	float min_dis2 = FLT_MAX;
+	size_t output_index = start_index;
+	for(int i=start_index; i<end_index; ++i)
 	{
-		ref_point_index = 1;
-		searchDir = 1;
+		float dis2  = pow(path_points[i].x  - x, 2) + pow(path_points[i].y  - y, 2);
+		if(dis2 < min_dis2)
+		{
+			min_dis2 = dis2;
+			output_index = i;
+		}
 	}
-	else if(ref_point_index == path_points.size()-1)
-	{
-		ref_point_index = path_points.size()-2;
-		searchDir = -1;
-	}
-	else
-	{
-		float dis2ref  = pow(path_points[ref_point_index].x   - x, 2) + 
-					     pow(path_points[ref_point_index].y   - y, 2);
-		float dis2last = pow(path_points[ref_point_index-1].x - x, 2) + 
-					     pow(path_points[ref_point_index-1].y - y, 2);
-		float dis2next = pow(path_points[ref_point_index+1].x - x, 2) + 
-					     pow(path_points[ref_point_index+1].y - y, 2);
-		if(dis2next > dis2ref && dis2last > dis2ref) 
-			searchDir = 0;
-		else if(dis2next > dis2ref && dis2ref > dis2last)
-			searchDir = -1;
-		else
-			searchDir = 1;
-	}
-	
-	//std::cout  <<  "searchDir:"  << "\t" << searchDir << "\r\n";
-	while(ref_point_index>0 && ref_point_index<path_points.size()-1)
-	{
-		float dis2ref  = pow(path_points[ref_point_index].x   - x, 2) + 
-							pow(path_points[ref_point_index].y   - y, 2);
-		float dis2last = pow(path_points[ref_point_index-1].x - x, 2) + 
-							pow(path_points[ref_point_index-1].y - y, 2);
-		float dis2next = pow(path_points[ref_point_index+1].x - x, 2) + 
-							pow(path_points[ref_point_index+1].y - y, 2);
-	//std::cout  << ref_point_index << "\t" <<  sqrt(dis2last)  << "\t" << sqrt(dis2ref) << "\t" << sqrt(dis2next) << "\r\n";		
-		if((searchDir == 1 && dis2next > dis2ref) ||
-		   (searchDir ==-1 && dis2last > dis2ref) ||
-		   (searchDir == 0))
-			break;
 
-		ref_point_index += searchDir;
-	}
+	nearest_point_index = output_index;
+	
 	float anchor_x,anchor_y, anchor_yaw; //锚点的位置和航向
-	anchor_x = path_points[ref_point_index].x;
-	anchor_y = path_points[ref_point_index].y;
-	anchor_yaw = path_points[ref_point_index].yaw;
-	
-	//若参考索引大于最大搜索索引,且目标物与车辆纵向距离大于一定阈值,则输出 FLT_MAX
-	if(ref_point_index >= max_search_index)
-	{
-		anchor_x = path_points[max_search_index].x;
-		anchor_y = path_points[max_search_index].y;
-		anchor_yaw = path_points[max_search_index].yaw;
-		float dy = (x-anchor_x)*sin(anchor_yaw) + (y-anchor_y) * cos(anchor_yaw);
-		//float dx = (x-anchor_x)*cos(anchor_yaw) - (y-anchor_y) * sin(anchor_yaw);
-	//printf("dx:%.2f\tdy:%.2f\tref_point_index:%d\tmax_search_index:%d\n",dx,dy,ref_point_index,max_search_index);
-		
-		if(dy > 0.5)
-			return FLT_MAX;
-	}
-	
-	//printf("dx:%.2f\tdy:%.2f\tref_point_index:%d\n",dx,dy,ref_point_index);
+	anchor_x = path_points[output_index].x;
+	anchor_y = path_points[output_index].y;
+	anchor_yaw = path_points[output_index].yaw;
 	
 	return (x-anchor_x)*cos(anchor_yaw) - (y-anchor_y) * sin(anchor_yaw);
 }
