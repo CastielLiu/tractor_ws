@@ -192,6 +192,13 @@ std::pair<size_t,float> findNearestPoint(const path_t& path, const gpsMsg_t& cur
 	
 	for(size_t i=0; i<path.points.size(); )
 	{
+		float yaw_diff = fabs(path.points[i].yaw - current_point.yaw);
+		if(yaw_diff > M_PI/4)
+		{
+			++i;
+			continue;
+		}
+			
 		dis = dis2Points(path.points[i],current_point,true);
 		// printf("i=%d\t dis:%f\n",i,dis);
 		// printf("path.points[%d] x:%lf\t y:%lf\n",i,path.points[i].x,path.points[i].y);

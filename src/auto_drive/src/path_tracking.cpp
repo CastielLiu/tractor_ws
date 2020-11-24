@@ -71,6 +71,8 @@ bool PathTracking::init(const gpsMsg_t& vehicle_point)
 	nearest_point_index_ = nearestPoint.first;
 	float dis2nearest_point = nearestPoint.second;
 
+	ROS_INFO("[%s] nearest_point_index: %lu  distancd:%.2f", __NAME__, nearest_point_index_, dis2nearest_point);
+
 	if(dis2nearest_point > 10.0)
 	{
 		ROS_ERROR("[%s] find nearest point failed. current pose is too far (%.2fm) from the given path!", __NAME__,dis2nearest_point);
@@ -169,10 +171,10 @@ bool PathTracking::update(float speed, float road_wheelangle,  //vehicle state
 		t_speed_ = 10.0;
 	
 	static int cnt = 0;
-	if(++cnt%20==0)
+	if(++cnt%10==0)
 	{
 		ROS_INFO("x: %.2f\t y:%.2f\t %.2f", current_pos_.x, current_pos_.y, current_pos_.yaw*180./M_PI);
-		ROS_INFO("nearest_index:%lu\t target_index:%lu ", nearest_point_index_, target_point_index_);
+		ROS_INFO("nearest_index:%lu\t target_index:%lu\t destination_index:%lu", nearest_point_index_, target_point_index_, destination_index_);
 		ROS_INFO("dis2target:%.2f\t yaw_err:%.2f\t lat_err:%.2f",dis_yaw.first,yaw_err*180.0/M_PI,lateral_err_);
 		ROS_INFO("disThreshold:%f\t expect angle:%.2f\t true_angle:%.2f",disThreshold_,t_roadwheel_angle_, road_wheelangle);
 	}

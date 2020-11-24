@@ -222,7 +222,7 @@ void Interface::callServiceThread(const CanMsg_t& can_msg)
 void Interface::uiHeartbeatOvertime_callback(const ros::TimerEvent& event)
 {
 	if(
-	ros::Time::now().toSec() - last_ui_heatbeat_time_ > 3.0 || //上位机心跳超时，可能can模块故障
+	ros::Time::now().toSec() - last_ui_heatbeat_time_ > 8.0 || //上位机心跳超时，可能can模块故障
 	!can2serial_->isRunning()) //USB松动导致读取/发送异常
 	{
 		ROS_INFO("[%s] relaunch can2serial...", __NAME__);
@@ -257,8 +257,8 @@ void Interface::readCanMsg()
 			}
 			case UI_HEARTBEAT_CAN_ID: //上位机UI界面心跳包
 				last_ui_heatbeat_time_ = ros::Time::now().toSec();
-				ROS_INFO("[%s] Received UI heart beat.",__NAME__);
-			
+				//ROS_INFO("[%s] Received UI heart beat.",__NAME__);
+				break;
 			default:
 				ROS_ERROR("[%s] Unknown CAN ID : 0x%02x", __NAME__, can_msg.ID);
 				break;
@@ -319,7 +319,7 @@ void Interface::msgReport_callback(const ros::TimerEvent& event)
 void Interface::heartbeat_callback(const ros::TimerEvent& event)
 {
 	std::lock_guard<std::mutex> lck(heart_beat_pkg_mutex_);
-	if(ros::Time::now().toSec() - last_gps_time_ > 0.3)
+	if(ros::Time::now().toSec() - last_gps_time_ > 2.0)
 	{
 		heart_beat_pkg_.gpsState = 1; //offline
 		ROS_ERROR("[%s] gps offline!", __NAME__);
