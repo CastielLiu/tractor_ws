@@ -31,7 +31,7 @@ class Interface
 	
   private:
 	void readCanMsg();
-	bool configCan2Serial();
+	bool configCan2Serial(bool reconfig = false);
 	void gps_callback(const gps_msgs::Inspvax::ConstPtr& msg);
 	void msgReport_callback(const ros::TimerEvent& event);
 	void heartbeat_callback(const ros::TimerEvent& event);

@@ -52,9 +52,9 @@ bool Interface::init()
 	sub_steerMoter_state_ = nh.subscribe("/base_control_state", 1, &Interface::baseControlState_callback, this);
 	sub_system_state_ = nh.subscribe("/system_state", 1, &Interface::driveSystemState_callback, this);
 		
-	msg_report_timer_ = nh.createTimer(ros::Duration(0.5), &Interface::msgReport_callback,this);
+	msg_report_timer_ = nh.createTimer(ros::Duration(0.1), &Interface::msgReport_callback,this);
 	heartbeat_timer_ = nh.createTimer(ros::Duration(0.5), &Interface::heartbeat_callback, this);
-	ui_heartbeat_timer_=nh.createTimer(ros::Duration(5.0), &Interface::uiHeartbeatOvertime_callback, this);
+	ui_heartbeat_timer_=nh.createTimer(ros::Duration(4.0), &Interface::uiHeartbeatOvertime_callback, this);
 	
 	//创建路径记录服务客户端
 	client_recordPath_ = nh.serviceClient<interface::RecordPath>("record_path_service");
@@ -70,7 +70,7 @@ bool Interface::init()
 	return configCan2Serial();
 }
 
-bool Interface::configCan2Serial()
+bool Interface::configCan2Serial(bool reconfig)
 {
 	is_msg_reading_ = false;
 	std::lock_guard<std::mutex> lck(msg_reading_mutex_); //锁定读取线程
@@ -97,13 +97,19 @@ bool Interface::configCan2Serial()
 
 	ROS_INFO("[%s] configure can baud_rate, filter.", __NAME__);
 	can2serial_->configBaudrate(can_baudrate_);
-	//can2serial_->clearCanFilter();
+	//can2serial_->setCanFilter(0x00,0x200,0x7f0); //200-20f
 	can2serial_->setCanFilter_alone(0x01,REQUEST_RECORD_PATH_CAN_ID);
 	can2serial_->setCanFilter_alone(0x02,REQUEST_RESET_CAN_ID);
 	can2serial_->setCanFilter_alone(0x03,REQUEST_DRIVERLESS_CAN_ID);
 	can2serial_->setCanFilter_alone(0x04,UI_HEARTBEAT_CAN_ID);
+
+	if(!reconfig)
+	{
+		//can2serial_->clearCanFilter();
+		
+	}
 	
-	
+	ros::Duration(0.5).sleep();
 	ROS_INFO("[%s] start read pkg from buffer.", __NAME__);
 	can2serial_->StartReading();
 	
@@ -221,12 +227,15 @@ void Interface::callServiceThread(const CanMsg_t& can_msg)
  */
 void Interface::uiHeartbeatOvertime_callback(const ros::TimerEvent& event)
 {
-	if(
-	ros::Time::now().toSec() - last_ui_heatbeat_time_ > 8.0 || //上位机心跳超时，可能can模块故障
-	!can2serial_->isRunning()) //USB松动导致读取/发送异常
+	if(ros::Time::now().toSec() - last_ui_heatbeat_time_ > 8.0)
+	{//上位机心跳超时，可能can模块故障
+		ROS_ERROR("[%s] UI heartbeat overtime, try to relaunch the can.", __NAME__);
+		this->configCan2Serial(true); //重启can模块
+	}
+	else if(!can2serial_->isRunning()) //USB松动导致读取/发送异常
 	{
-		ROS_INFO("[%s] relaunch can2serial...", __NAME__);
-		this->configCan2Serial(); //重启can模块
+		ROS_ERROR("[%s] can2serial running failed. try to relaunch the can.", __NAME__);
+		this->configCan2Serial(true); //重启can模块
 	}
 }
 

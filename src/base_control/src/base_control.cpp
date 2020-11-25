@@ -203,7 +203,7 @@ void BaseControl::cmd_callback(const driverless_msgs::ControlCmd::ConstPtr& msg)
 	}
 	else
 	{
-		ROS_INFO("[%s] brake_state: %d  expect_state: %d", __NAME__, brake_state_value_ ,msg->set_brake);
+		//ROS_INFO("[%s] brake_state: %d  expect_state: %d", __NAME__, brake_state_value_ ,msg->set_brake);
 	}
 }
 
