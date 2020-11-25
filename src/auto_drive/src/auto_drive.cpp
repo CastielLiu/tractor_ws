@@ -212,12 +212,13 @@ void AutoDrive::autoDriveThread(float speed)
 	
 	while(ros::ok() && sys_state_.isTracking())
 	{
+		/*
 		if(sys_state_.get() == sys_state_.State_SuspendTrack)
 		{
 			loop_rate.sleep();
 			continue;
 		}
-		
+		*/
 		pose_wr_mutex_.lock_shared();
 		bool update_state = tracker_.update(vehicle_speed_, base_state_.roadWheelAngle, pose_, 0.0);
 		pose_wr_mutex_.unlock_shared();
@@ -370,15 +371,15 @@ bool AutoDrive::recordPathService(interface::RecordPath::Request  &req,
 		recorder_.stopAndSave();
 		sys_state_.set(sys_state_.State_SystemIdle);
 	}
-	
-	ROS_INFO("[%s] request complete.", __NAME__);
+	else
+		ROS_ERROR("[%s] recordPathService, cmd or type error.", __NAME__);
+		
 	res.success = res.SUCCESS;
 	return true;
 }
 
 void AutoDrive::odom_callback(const nav_msgs::Odometry::ConstPtr& msg)
 {
-	
 	write_lock_t write_lock(pose_wr_mutex_);
 	pose_.x = msg->pose.pose.position.x;
 	pose_.y = msg->pose.pose.position.y;
@@ -387,6 +388,7 @@ void AutoDrive::odom_callback(const nav_msgs::Odometry::ConstPtr& msg)
 	pose_.longitude = msg->pose.covariance[1];
 	pose_.latitude = msg->pose.covariance[2];
 	
+	//std::cout << std::fixed << std::setprecision(2) << pose_.x << "\t" << pose_.y << std::endl;
 	//vehicle_speed_ = 
 }
 
