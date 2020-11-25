@@ -33,7 +33,7 @@ public:
 	
 	bool update(float speed, float road_wheelangle,  //vehicle state
 			   const gpsMsg_t& vehicle_point,      //vehicle positoin
-			   const float& path_offset); 
+			   const float path_offset); 
 	void getTrackingCmd(float& speed, float& roadWheelAngle);
 
 private:

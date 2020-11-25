@@ -1,4 +1,5 @@
 #include "auto_drive/path_tracking.h"
+#include "tf2_geometry_msgs/tf2_geometry_msgs.h"
 
 /* path tracking module for intelligent tractor
  * author: liushuaipeng, southeast university
@@ -12,6 +13,7 @@ PathTracking::PathTracking(const ros::NodeHandle& nh, const ros::NodeHandle& nh_
     nh_private_(nh_private)
 {
 	is_running_ = false;
+	lateral_err_ = 0.0;
 }
 
 PathTracking::~PathTracking()
@@ -22,7 +24,7 @@ void PathTracking::publishGlobalPath(const path_t& path)
 {
 	if(path.size() == 0)
 		return;
-
+	//广播tf变换 发布gps在路径第一个点坐标系下的位置
 	geometry_msgs::TransformStamped transformStamped;
 	transformStamped.header.stamp = ros::Time::now();
 	transformStamped.header.frame_id = "start";
@@ -31,12 +33,11 @@ void PathTracking::publishGlobalPath(const path_t& path)
 	transformStamped.transform.translation.y = current_pos_.y - path[0].y;
 	transformStamped.transform.translation.z = 0.0;
 
-	transformStamped.transform.rotation.x = 0; // quat.x();
-	transformStamped.transform.rotation.y = 0; //quat.y();
-	transformStamped.transform.rotation.z = 0; //quat.z();
-	transformStamped.transform.rotation.w = 1; //quat.w();
+	tf2::Quaternion q;
+	q.setRPY(0.0, 0.0, current_pos_.yaw);
+	q.normalize();
+	transformStamped.transform.rotation = tf2::toMsg(q);
 	tf_br_.sendTransform(transformStamped);
-
 
 	global_path_.header.frame_id = "start";
 	global_path_.header.stamp = ros::Time::now();
@@ -58,9 +59,10 @@ void PathTracking::publishGlobalPath(const path_t& path)
 	global_path_.poses.reserve(points_ptr->size());
 	for(const gpsMsg_t point:(*points_ptr))
 	{
+		//将所有路径点转换到以路径第一个点为原点的局部坐标系下
 		geometry_msgs::PoseStamped pose;
-		pose.pose.position.x = point.x - path[0].x;;
-		pose.pose.position.y = point.y - path[0].y;;
+		pose.pose.position.x = point.x - path[0].x;
+		pose.pose.position.y = point.y - path[0].y;
 		pose.header.stamp = global_path_.header.stamp;
 		pose.header.frame_id="start";
 		global_path_.poses.push_back(pose);
@@ -96,7 +98,7 @@ bool PathTracking::init(const gpsMsg_t& vehicle_point)
 
 	pub_info_ = nh_.advertise<driverless_msgs::PathTrackingInfo>("/tracking_info",1);
 	pub_global_path_ = nh_.advertise<nav_msgs::Path>("/global_path",1);
-	pub_global_path_timer_ = nh_.createTimer(ros::Duration(0.3), &PathTracking::pubGlobalPathTimerCallback, this);
+	pub_global_path_timer_ = nh_.createTimer(ros::Duration(0.2), &PathTracking::pubGlobalPathTimerCallback, this);
 
 	target_point_index_ = nearest_point_index_;
 	return true;
@@ -142,7 +144,7 @@ bool PathTracking::extendGlobalPath(float extendDis)
  */
 bool PathTracking::update(float speed, float road_wheelangle,  //vehicle state
 						 const gpsMsg_t& vehicle_point,      //vehicle positoin
-						 const float& path_offset)
+						 const float path_offset)
 {
     current_pos_ = vehicle_point;
 	vehicle_speed_ = speed;
@@ -150,8 +152,8 @@ bool PathTracking::update(float speed, float road_wheelangle,  //vehicle state
 
 	target_point_ = path_.points[target_point_index_];
 
-	//disThreshold_ = foreSightDis_latErrCoefficient_ * fabs(lateral_err_) + min_foresight_distance_;
-	disThreshold_ = min_foresight_distance_;  
+	disThreshold_ = foreSightDis_latErrCoefficient_ * fabs(lateral_err_) + min_foresight_distance_;
+	//disThreshold_ = min_foresight_distance_;  
 
 	if( path_offset != 0.0)
 		target_point_ = pointOffset(target_point_, path_offset);
@@ -161,7 +163,6 @@ bool PathTracking::update(float speed, float road_wheelangle,  //vehicle state
 	while( dis_yaw.first < disThreshold_)
 	{
 		target_point_ = path_.points[++target_point_index_];
-
 		dis_yaw = get_dis_yaw(target_point_, vehicle_point);
 	}
 
@@ -223,7 +224,7 @@ void PathTracking::publishInfo()
 	info_.nearest_point_index = nearest_point_index_;
 	info_.target_point_index = target_point_index_;
 	info_.speed = vehicle_speed_;
-	info_.lateral_err = lateral_err_;
+	info_.lateral_err = lateral_err_/3.0;
 	info_.latitude = current_pos_.latitude;
 	info_.longitude = current_pos_.longitude;
 

@@ -108,6 +108,7 @@ bool BaseControl::init()
 
 	if(!steerMotor_.init(steerMotor_port_name_,115200))
 	{
+		//若初始化转向电机失败，直接返回false，程序退出，然后在launch中将自动重启
 	    ROS_ERROR("[%s] init steering motor failed.", __NAME__);
 		/*if(ignore_steer_error_) //debug mode
 		{

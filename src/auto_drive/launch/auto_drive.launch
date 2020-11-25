@@ -32,7 +32,7 @@
 		<param name="parent_frame_id" value="world"/>
 		<param name="child_frame_id" value="gps"/>
 		<param name="pub_odom" value="true"/>
-		<param name="pub_tf" value="true"/>
+		<param name="pub_tf" value="false"/>
 	</node>
 
 	<!-- node name="base_gps_tf" pkg="tf" type="static_transform_publisher" args="0 0 0 0 0 0 base_link gps 50"/-->
@@ -48,7 +48,6 @@
 		<param name="max_steer_rotate_speed" value="80"/>
 		
 		<param name="cmd_topic" value="$(arg cmd_topic)"/>
-		
 		<param name="ignore_steer_error" value="true"/>
 		<param name="ignore_braker_error" value="true"/>
 		
