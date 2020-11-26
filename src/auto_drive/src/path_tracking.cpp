@@ -34,7 +34,7 @@ void PathTracking::publishGlobalPath(const path_t& path)
 	transformStamped.transform.translation.z = 0.0;
 
 	tf2::Quaternion q;
-	q.setRPY(0.0, 0.0, path[0].yaw-current_pos_.yaw); 
+	q.setRPY(0.0, 0.0, current_pos_.yaw-path[0].yaw); 
 	q.normalize();
 	transformStamped.transform.rotation = tf2::toMsg(q);
 	tf_br_.sendTransform(transformStamped);

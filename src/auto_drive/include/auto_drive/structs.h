@@ -69,7 +69,8 @@ typedef struct
 			float delta_x = endPoint.x - startPoint.x;
 			float delta_y = endPoint.y - startPoint.y;
 			float distance = sqrt(delta_x*delta_x + delta_y*delta_y);
-			double yaw = atan2(delta_y, delta_x);
+
+			double yaw = atan2(delta_y, delta_x); 
 			int point_cnt = distance / increment;
 			
 			double x_increment = (endPoint.x - startPoint.x)/point_cnt;
@@ -81,7 +82,6 @@ typedef struct
 				now.x = startPoint.x + x_increment*j;
 				now.y = startPoint.y + y_increment*j;
 				now.yaw = yaw;
-
 				points.push_back(now);
 			}
 		}
