@@ -34,7 +34,7 @@ void PathTracking::publishGlobalPath(const path_t& path)
 	transformStamped.transform.translation.z = 0.0;
 
 	tf2::Quaternion q;
-	q.setRPY(0.0, 0.0, current_pos_.yaw);
+	q.setRPY(0.0, 0.0, path[0].yaw-current_pos_.yaw); 
 	q.normalize();
 	transformStamped.transform.rotation = tf2::toMsg(q);
 	tf_br_.sendTransform(transformStamped);
@@ -195,6 +195,7 @@ bool PathTracking::update(float speed, float road_wheelangle,  //vehicle state
 		ROS_INFO("nearest_index:%lu\t target_index:%lu\t destination_index:%lu", nearest_point_index_, target_point_index_, destination_index_);
 		ROS_INFO("dis2target:%.2f\t yaw_err:%.2f\t lat_err:%.2f",dis_yaw.first,yaw_err*180.0/M_PI,lateral_err_);
 		ROS_INFO("disThreshold:%f\t expect angle:%.2f\t true_angle:%.2f",disThreshold_,t_roadwheel_angle_, road_wheelangle);
+		ROS_INFO("path_yaw:%.2f\t yaw:%.2f", path_.points[nearest_point_index_].yaw*180.0/M_PI, current_pos_.yaw*180./M_PI);
 	}
 	this->publishInfo();
 	return true;

@@ -45,7 +45,7 @@
 		<param name="road_wheel_angle_offset" value="-82"/>
 		<param name="max_road_wheel_angle" value="35.0"/>
 		<param name="min_steer_rotate_speed" value="10"/>
-		<param name="max_steer_rotate_speed" value="80"/>
+		<param name="max_steer_rotate_speed" value="100"/>
 		
 		<param name="cmd_topic" value="$(arg cmd_topic)"/>
 		<param name="ignore_steer_error" value="true"/>

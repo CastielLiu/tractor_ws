@@ -320,7 +320,6 @@ bool AutoDrive::recordPathService(interface::RecordPath::Request  &req,
 		else if(req.path_type == req.VERTEX_TYPE) //顶点型路径记录
 		{
 			ROS_INFO("[%s] Request start record path: vertex type.",__NAME__);
-
 			//开始顶点型路径记录
 			bool ok = recorder_.startVertexPathRecord(req.path_file_name);
 			if(!ok)

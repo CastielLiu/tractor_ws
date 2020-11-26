@@ -213,7 +213,13 @@ void Interface::callServiceThread(const CanMsg_t& can_msg)
 		if(resetMsg->rebootMotor) //重启转向电机
 			client_rebootMotor_.call(empty);
 		if(resetMsg->brakeReset)  //复位制动执行器
-			client_resetBraker_.call(empty);
+		{
+			interface::Driverless srv_driverless; //确认停止自动驾驶，恢复系统空闲状态
+			srv_driverless.request.command_type = srv_driverless.request.CONFIRM_STOP; 
+			client_driverless_.call(srv_driverless);
+
+			client_resetBraker_.call(empty); //复位制动执行器
+		}
 		
 		can2serial_->showCanMsg(can_msg, "request reset");
 	}

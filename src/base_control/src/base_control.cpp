@@ -137,7 +137,8 @@ bool BaseControl::resetBrakeService(std_srvs::Empty::Request  &req,std_srvs::Emp
 	ROS_INFO("[%s] Request reset the braker.", __NAME__);
     std_msgs::UInt8 brakeVal;
 	brakeVal.data = 0;
-	for(int i=0; i<20; ++i){
+	for(int i=0; i<20; ++i)
+	{
 		pub_brakeCmd_.publish(brakeVal);
 		ros::Duration(0.02).sleep();
 	}
@@ -193,7 +194,11 @@ void BaseControl::cmd_callback(const driverless_msgs::ControlCmd::ConstPtr& msg)
 	}
 
 	driverless_mode_ = msg->driverless_mode;
-	
+	//转发制动指令
+	std_msgs::UInt8 brakeVal;
+	brakeVal.data = msg->set_brake;
+	pub_brakeCmd_.publish(brakeVal);
+	/*
 	if(brake_state_value_ != msg->set_brake)
 	{
 		//转发制动指令
@@ -205,6 +210,7 @@ void BaseControl::cmd_callback(const driverless_msgs::ControlCmd::ConstPtr& msg)
 	{
 		//ROS_INFO("[%s] brake_state: %d  expect_state: %d", __NAME__, brake_state_value_ ,msg->set_brake);
 	}
+	*/
 }
 
 void BaseControl::steerDebug_callback(const driverless_msgs::SteerMotorDebug::ConstPtr& debug)

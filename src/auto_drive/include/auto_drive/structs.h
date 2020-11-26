@@ -65,9 +65,11 @@ typedef struct
 		{
 			gpsMsg_t startPoint = vertexes[i-1];
 			gpsMsg_t endPoint = vertexes[i];
-			float delta_x = startPoint.x-endPoint.x;
-			float delta_y = startPoint.y-endPoint.y;
+
+			float delta_x = endPoint.x - startPoint.x;
+			float delta_y = endPoint.y - startPoint.y;
 			float distance = sqrt(delta_x*delta_x + delta_y*delta_y);
+			double yaw = atan2(delta_y, delta_x);
 			int point_cnt = distance / increment;
 			
 			double x_increment = (endPoint.x - startPoint.x)/point_cnt;
@@ -78,6 +80,8 @@ typedef struct
 				gpsMsg_t now;
 				now.x = startPoint.x + x_increment*j;
 				now.y = startPoint.y + y_increment*j;
+				now.yaw = yaw;
+
 				points.push_back(now);
 			}
 		}

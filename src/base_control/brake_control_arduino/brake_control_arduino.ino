@@ -58,18 +58,14 @@ void requestSensorVal_callback(const std_msgs::Empty& msg)
   g_pub_adc_r.publish(&g_brake_sensor_adc_r_feedback);
 }
 
-void rotateClutch(int dir, int k, int rotate_duration_us)
+void rotateClutch(int dir, int pwm_duration_us, int rotate_duration_us)
 {
-  //dir=HIGH/LOW,LOW--brake, HIGH--back
-  //speed=500(fast)-2500(slow)
-  //k=(fast)1,2,3,4,5(slow)
-  int pwm_duration_us = k*1000;
   int pwm_duration_half_us = pwm_duration_us/2;
-  //int for_cnt = rotate_duration_us/pwm_duration_us;
-  digitalWrite(EN1,LOW); 
+  int for_cnt = rotate_duration_us/pwm_duration_us;
+  digitalWrite(EN1,LOW);
   digitalWrite(DIR1,dir);
   
-  for(int i=1; i<10; i++){ //circles of spanning,4000=1 circle
+  for(int i=1; i<for_cnt; i++){ //circles of spanning,4000=1 circle
       digitalWrite(PUL1,HIGH);  
       delayMicroseconds(pwm_duration_half_us); //speed of spanning //us
       digitalWrite(PUL1,LOW);  
@@ -77,18 +73,14 @@ void rotateClutch(int dir, int k, int rotate_duration_us)
     }
 }
 
-void rotateBrake(int dir, int k, int rotate_duration_us)
+void rotateBrake(int dir, int pwm_duration_us, int rotate_duration_us)
 {
-  //dir=HIGH/LOW,LOW--brake, HIGH--back
-  // speed = (fast) 500-2500  (slow)
-  //   k =   (fast) 1,2,3,4,5 (slow)
-  int pwm_duration_us = k*1000;
   int pwm_duration_half_us = pwm_duration_us/2;
- // int for_cnt = rotate_duration_us/pwm_duration_us;
+  int for_cnt = rotate_duration_us/pwm_duration_us;
   digitalWrite(EN2,LOW); 
   digitalWrite(DIR2,dir);
   
-  for(int i=1; i<10; i++){ //circles of spanning,4000=1 circle
+  for(int i=1; i<for_cnt; i++){ //circles of spanning,4000=1 circle
     digitalWrite(PUL2,HIGH);  
     delayMicroseconds(pwm_duration_half_us); //speed of spanning 
     digitalWrite(PUL2,LOW);  
@@ -99,7 +91,13 @@ void rotateBrake(int dir, int k, int rotate_duration_us)
 void cmd_callback(const std_msgs::UInt8& cmd_msg)
 {
   static int rotate_duration_us = 1000000/20/2; //1000000us / 20hz /2motors
-  int k=1;
+  static int pwm_duration_us    = 500; //us
+  static int brake_up_limited = 0;
+  static int brake_down_limited = 0;
+  static int clutch_up_limited = 0;
+  static int clutch_down_limited = 0;
+  
+  
   g_expect_brake_grade = cmd_msg.data;
   g_adc_l = analogRead(ADC_L_PIN);
   g_adc_r = analogRead(ADC_R_PIN);
@@ -110,24 +108,29 @@ void cmd_callback(const std_msgs::UInt8& cmd_msg)
   {
     if ( g_adc_l > g_adc_l_min) //left clutch
     {
-      if (g_brake_state_feedback.data < 5)
-      rotateClutch(CLUTCH_DIR_PRESS,k, rotate_duration_us);
+      rotateClutch(CLUTCH_DIR_PRESS, pwm_duration_us, rotate_duration_us);
     }
-   
       
     if ( g_adc_r > g_adc_r_min) //right brake
-      {
-        if (g_brake_state_feedback.data < 5)
-        rotateBrake(BRAKE_DIR_PRESS,k, rotate_duration_us);
-      }
+    {
+        rotateBrake(BRAKE_DIR_PRESS, pwm_duration_us, rotate_duration_us);
+    }
+    
+    //received pressed cmd the release limit reset
+    brake_up_limited = 0;
+    clutch_up_limited = 0;
   }
   else //  go back
   {
-    if (g_adc_l < g_adc_l_max)  
-      rotateClutch(CLUTCH_DIR_RELEASE,k, rotate_duration_us) ;  
+    if (g_adc_l < g_adc_l_max && clutch_up_limited == 0) 
+      rotateClutch(CLUTCH_DIR_RELEASE, pwm_duration_us, rotate_duration_us);
+    else
+      clutch_up_limited = 1;
       
-    if (g_adc_r < g_adc_r_max)  
-      rotateBrake(BRAKE_DIR_RELEASE,k, rotate_duration_us) ;
+    if (g_adc_r < g_adc_r_max && brake_up_limited == 0)  
+      rotateBrake(BRAKE_DIR_RELEASE, pwm_duration_us, rotate_duration_us) ;
+    else
+      brake_up_limited = 1;
   }
   
   if(g_brake_state_feedback.data > g_brake_tatol_grade)
