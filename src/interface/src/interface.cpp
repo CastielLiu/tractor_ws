@@ -289,7 +289,8 @@ void Interface::gps_callback(const gps_msgs::Inspvax::ConstPtr& msg)
 	can_pkgs_.gpsMsg.data[2] |= 0x01; // none differentiation positioning 
 	*(uint16_t *)(can_pkgs_.gpsMsg.data+6) = height;
 
-	float speed = sqrt(msg->east_velocity*msg->east_velocity+msg->north_velocity*msg->north_velocity);
+	float speed = sqrt(msg->east_velocity*msg->east_velocity + 
+					   msg->north_velocity*msg->north_velocity) * 3.6;
 	uint16_t u16_speed = uint16_t(speed *10);
 	can_pkgs_.gpsMsg.data[3] = u16_speed%256;
 	can_pkgs_.gpsMsg.data[4] = u16_speed/256;
