@@ -388,7 +388,7 @@ void AutoDrive::odom_callback(const nav_msgs::Odometry::ConstPtr& msg)
 	pose_.latitude = msg->pose.covariance[2];
 	
 	//std::cout << std::fixed << std::setprecision(2) << pose_.x << "\t" << pose_.y << std::endl;
-	//vehicle_speed_ = 
+	vehicle_speed_ = msg->twist.twist.linear.x;
 }
 
 //获取前轮转角值

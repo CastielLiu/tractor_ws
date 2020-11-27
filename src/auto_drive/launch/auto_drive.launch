@@ -18,7 +18,8 @@
 	<node name="auto_drive_node" pkg="auto_drive" type="auto_drive_node" output="screen" respawn="true">
 	    <param name="utm_topic" value="$(arg utm_topic)"/>  
 		<param name="path_file_dir" value="$(find auto_drive)/data/"/>
-		<param name="foreSightDis_speedCoefficient" value="1.8"/>
+		<param name="foreSightDis_speedCoefficient" value="1.0"/>
+		<param name="foreSightDis_latErrCoefficient" value="-0.5"/>
 		<param name="min_foresight_distance" value="4.0"/>
 		<param name="wheel_base" value="2.0"/>
 		<param name="cmd_topic" value="$(arg cmd_topic)"/>

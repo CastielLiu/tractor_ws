@@ -152,9 +152,10 @@ bool PathTracking::update(float speed, float road_wheelangle,  //vehicle state
 
 	target_point_ = path_.points[target_point_index_];
 
-	disThreshold_ = foreSightDis_latErrCoefficient_ * fabs(lateral_err_) + min_foresight_distance_;
-	//disThreshold_ = min_foresight_distance_;  
-
+	disThreshold_ = foreSightDis_latErrCoefficient_ * fabs(lateral_err_) 
+				  + foreSightDis_speedCoefficient_  * vehicle_speed_
+				  + min_foresight_distance_;
+				  
 	if( path_offset != 0.0)
 		target_point_ = pointOffset(target_point_, path_offset);
 
@@ -196,6 +197,7 @@ bool PathTracking::update(float speed, float road_wheelangle,  //vehicle state
 		ROS_INFO("dis2target:%.2f\t yaw_err:%.2f\t lat_err:%.2f",dis_yaw.first,yaw_err*180.0/M_PI,lateral_err_);
 		ROS_INFO("disThreshold:%f\t expect angle:%.2f\t true_angle:%.2f",disThreshold_,t_roadwheel_angle_, road_wheelangle);
 		ROS_INFO("path_yaw:%.2f\t yaw:%.2f", path_.points[nearest_point_index_].yaw*180.0/M_PI, current_pos_.yaw*180./M_PI);
+		ROS_INFO("current_speed: %.2f km/h", vehicle_speed_*3.6);
 	}
 	this->publishInfo();
 	return true;
