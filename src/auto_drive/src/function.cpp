@@ -127,7 +127,7 @@ std::pair<float, float> get_dis_yaw(const gpsMsg_t &point1, const gpsMsg_t &poin
 	
 	std::pair<float, float> dis_yaw;
 	dis_yaw.first = sqrt(x * x + y * y);
-	dis_yaw.second = atan2(x,y);
+	dis_yaw.second = atan2(y,x);
 	
 	if(dis_yaw.second <0)
 		dis_yaw.second += 2*M_PI;
@@ -147,11 +147,13 @@ std::pair<size_t,float> findNearestPoint(const path_t& path, const gpsMsg_t& cur
 	
 	for(size_t i=0; i<path.points.size(); )
 	{
-		float yaw_diff = fabs(path.points[i].yaw - current_point.yaw);
-		if(yaw_diff > 2*M_PI) yaw_diff-= 2*M_PI;
+		float yaw_diff = path.points[i].yaw - current_point.yaw;
+
+		if(yaw_diff > M_PI) yaw_diff-= 2*M_PI;
+		else if(yaw_diff < -M_PI) yaw_diff += 2*M_PI;
 
 		//printf("pathyaw: %.2f\t yaw: %.2f\t error:%.2f\r\n", path.points[i].yaw*180.0/M_PI, current_point.yaw*180.0/M_PI, yaw_diff*180.0/M_PI);
-		if(yaw_diff > M_PI/4)
+		if(fabs(yaw_diff) > M_PI/4)
 		{
 			++i;
 			continue;

@@ -175,7 +175,7 @@ bool PathTracking::update(float speed, float road_wheelangle,  //vehicle state
 	if(yaw_err==0.0)
 		return true;
 	
-	float turning_radius = (0.5 * dis_yaw.first)/sin(yaw_err);
+	float turning_radius = -(0.5 * dis_yaw.first)/sin(yaw_err);
 
 	t_roadwheel_angle_ = generateRoadwheelAngleByRadius(turning_radius, wheel_base_);
 	
