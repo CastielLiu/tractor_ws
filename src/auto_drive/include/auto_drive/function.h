@@ -7,6 +7,7 @@
 #include <float.h>
 #include <assert.h>
 #include "structs.h"
+#include <time.h>
 
 
 float calculateDis2path(const double& x,const double& y,
@@ -33,5 +34,14 @@ gpsMsg_t pointOffset(const gpsMsg_t& point,float offset);
 float generateRoadwheelAngleByRadius(const float& radius, const float& wheel_base);
 
 bool loadPath(const std::string& file_path, path_t& path, float interpolation=0.0);
+
+static std::string getStampFileName(const std::string& suffix)
+{
+	char s[100] = {0};
+	time_t t = time(0);
+	struct tm _tm = *localtime(&t);
+	strftime(s, sizeof(s), "%Y%m%d_%H%M%S", &_tm);
+	return std::string(s) + suffix;
+}
 
 #endif

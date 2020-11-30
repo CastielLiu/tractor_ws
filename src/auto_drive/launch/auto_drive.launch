@@ -6,6 +6,7 @@
     <arg name="utm_topic" value="/gps_odom"/>
     <arg name="cmd_topic" value="/tractor_cmd"/>
     
+	<param name="log_dir" value="$(find auto_drive)/log/"/>
     <!-- interface -->
 	<node name="interface_node" pkg="interface" type="interface_node" output="screen" respawn="true">
 	    <param name="utm_topic" value="$(arg utm_topic)"/>

@@ -209,7 +209,7 @@ void AutoDrive::autoDriveThread(float speed)
 		speed = max_speed_;
 	
 	ros::Rate loop_rate(20);
-	
+
 	while(ros::ok() && sys_state_.isTracking())
 	{
 		/*
@@ -240,6 +240,7 @@ void AutoDrive::autoDriveThread(float speed)
 #if USE_AVOIDANCE
 	avoider_.shutDown();
 #endif
+	tracker_.stop();
 }
 
 //定时发布控制指令

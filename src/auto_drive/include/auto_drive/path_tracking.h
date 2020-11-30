@@ -37,7 +37,9 @@ public:
 			   const gpsMsg_t& vehicle_point,      //vehicle positoin
 			   const float path_offset); 
 	void getTrackingCmd(float& speed, float& roadWheelAngle);
-	bool setLogFile(const std::string& str);
+	bool openLogFile();
+	bool closeLogFile();
+	void stop();
 
 private:
 	void publishInfo();

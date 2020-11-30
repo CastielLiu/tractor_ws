@@ -102,7 +102,7 @@ bool PathTracking::init(const gpsMsg_t& vehicle_point)
 	pub_global_path_timer_ = nh_.createTimer(ros::Duration(0.2), &PathTracking::pubGlobalPathTimerCallback, this);
 
 	target_point_index_ = nearest_point_index_;
-	return true;
+	return openLogFile();
 }
 
 /*@brief 拓展全局路径,防止车辆临近终点时无法预瞄
@@ -201,7 +201,8 @@ bool PathTracking::update(float speed, float road_wheelangle,  //vehicle state
 		ROS_INFO("path_yaw:%.2f\t yaw:%.2f", path_.points[nearest_point_index_].yaw*180.0/M_PI, current_pos_.yaw*180./M_PI);
 		ROS_INFO("current_speed: %.2f km/h", vehicle_speed_*3.6);
 	}
-	this->publishInfo();
+	if(cnt%2 == 0)
+		this->publishInfo();
 	return true;
 }
 
@@ -227,27 +228,57 @@ void PathTracking::publishInfo()
 {
 	lat_error_buffer_.push_back(lateral_err_);
 	float sum = std::accumulate(lat_error_buffer_.begin(), lat_error_buffer_.end(), 0);
-	float lat_err = sum/lat_error_buffer_.size();
+	float lat_err = sum/lat_error_buffer_.size()/3.0;
 
 	info_.nearest_point_index = nearest_point_index_;
 	info_.target_point_index = target_point_index_;
 	info_.speed = vehicle_speed_;
-	info_.lateral_err = lat_err/3.0;   //lateral_err_
+	info_.lateral_err = lat_err;   //lateral_err_
 	info_.latitude = current_pos_.latitude;
 	info_.longitude = current_pos_.longitude;
+
+	log_fd_ << std::fixed << std::setprecision(3) 
+		<< current_pos_.x << "\t" << current_pos_.y <<"\t" << lat_err << "\r\n";
 
 	pub_info_.publish(info_);
 }
 
-bool PathTracking::setLogFile(const std::string& str)
+bool PathTracking::openLogFile()
 {
-	log_file_name_ = str;
-	log_fd_.open(log_file_name_.c_str());
-	if(!log_fd_.is_open())
+	ros::NodeHandle nh;
+	std::string log_dir = nh.param<std::string>("log_dir","");
+	if(log_dir.empty())
 	{
-
-		ROS_ERROR("[%s] open log file %s failed.", __NAME__, str.c_str());
+		ROS_ERROR("[%s] the log_dir is empty, please set it in launch file.", __NAME__);
 		return false;
 	}
+	std::string log_file = log_dir + "/" + getStampFileName(".txt");
+	log_fd_.open(log_file.c_str());
+	if(!log_fd_.is_open())
+	{
+		ROS_ERROR("[%s] open log file %s failed.", __NAME__, log_file.c_str());
+		return false;
+	}
+
+	//save the path points first
+	for(int i=0; i<path_.points.size(); ++i)
+	{
+		const gpsMsg_t& point = path_.points[i];
+		log_fd_ << std::fixed << std::setprecision(3) 
+				<< point.x << "\t" << point.y << "\r\n";
+	}
+	log_fd_ << "----------------------------\r\n";
+
 	return true;
+}
+
+bool PathTracking::closeLogFile()
+{
+	if(log_fd_.is_open())
+		log_fd_.close();
+}
+
+void PathTracking::stop()
+{
+	this->closeLogFile();
 }
