@@ -227,8 +227,15 @@ void PathTracking::getTrackingCmd(float& speed, float& roadWheelAngle)
 void PathTracking::publishInfo()
 {
 	lat_error_buffer_.push_back(lateral_err_);
-	float sum = std::accumulate(lat_error_buffer_.begin(), lat_error_buffer_.end(), 0);
+	float sum = 0.0;
+
+	for(auto it=lat_error_buffer_.begin(); it!=lat_error_buffer_.end(); ++it)
+		sum += *it ;
+
+	//sum = std::accumulate(lat_error_buffer_.begin(), lat_error_buffer_.end(), 0);
 	float lat_err = sum/lat_error_buffer_.size()/3.0;
+
+	//std::cout << lat_error_buffer_.size() << "\t" << lateral_err_  << "\t" << sum << std::endl;
 
 	info_.nearest_point_index = nearest_point_index_;
 	info_.target_point_index = target_point_index_;
@@ -259,6 +266,8 @@ bool PathTracking::openLogFile()
 		ROS_ERROR("[%s] open log file %s failed.", __NAME__, log_file.c_str());
 		return false;
 	}
+	else
+		ROS_INFO("[%s] open log file %s ok.", __NAME__,log_file.c_str() );
 
 	//save the path points first
 	for(int i=0; i<path_.points.size(); ++i)

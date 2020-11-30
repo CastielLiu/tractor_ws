@@ -34,6 +34,8 @@ class Points:
 				self.dst_x.append(float(msg[0]))
 				self.dst_y.append(float(msg[1]))
 				self.lat_err.append(float(msg[2]))
+		
+		print(len(self.src_x), len(self.dst_x))
 			
 	def plot(self):
 		plt.plot(self.src_x, self.src_y, "r")

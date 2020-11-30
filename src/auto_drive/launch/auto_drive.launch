@@ -44,7 +44,7 @@
 		<param name="steering_port" value="$(arg steering_port)"/>
 		<param name="road_wheel_angle_resolution" value="0.04"/> <!--1 adc 对应的角度值 -->
 		
-		<param name="road_wheel_angle_offset" value="-82"/>
+		<param name="road_wheel_angle_offset" value="-83.5"/>  <!-- -82 -->
 		<param name="max_road_wheel_angle" value="35.0"/>
 		<param name="min_steer_rotate_speed" value="10"/>
 		<param name="max_steer_rotate_speed" value="100"/>
