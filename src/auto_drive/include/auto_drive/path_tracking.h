@@ -8,9 +8,11 @@
 #include"auto_drive/function.h"
 #include<std_msgs/Float32.h>
 #include<std_msgs/Float32.h>
+#include <fstream>
 
 #include<nav_msgs/Path.h>
 #include<boost/thread.hpp>
+#include <boost/circular_buffer.hpp>
 #include<std_msgs/UInt32.h>
 #include<std_msgs/UInt8.h>
 #include<std_msgs/Bool.h>
@@ -35,6 +37,7 @@ public:
 			   const gpsMsg_t& vehicle_point,      //vehicle positoin
 			   const float path_offset); 
 	void getTrackingCmd(float& speed, float& roadWheelAngle);
+	bool setLogFile(const std::string& str);
 
 private:
 	void publishInfo();
@@ -50,6 +53,8 @@ private:
 	ros::Publisher pub_global_path_;
 	nav_msgs::Path global_path_;
 	ros::Timer pub_global_path_timer_;
+	std::string log_file_name_;
+	std::ofstream log_fd_;
 
 	tf2_ros::TransformBroadcaster tf_br_;
 	
@@ -79,6 +84,8 @@ private:
 	bool is_running_;
 	size_t destination_index_;
 	bool is_new_task_;
+
+	boost::circular_buffer<float> lat_error_buffer_;
 };
 
 

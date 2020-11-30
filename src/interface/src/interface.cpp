@@ -306,7 +306,11 @@ void Interface::path_tracking_info_callback(const driverless_msgs::PathTrackingI
 {
 	last_track_info_time_ = ros::Time::now().toSec();
 
-	uint16_t lateral_err = uint16_t(info->lateral_err*100) + 255;
+	float lateral_errf = info->lateral_err;
+	if(lateral_errf > 0.255) lateral_errf = 0.255;
+	else if(lateral_errf < -0.255) lateral_errf = -0.255;
+
+	uint16_t lateral_err = uint16_t(lateral_errf*1000) + 255;
 	//ROS_INFO("lateral_err:%.2f \t speed:%.2f",info->lateral_err,info->speed );
 	can_pkgs_.gpsMsg.data[4] |= lateral_err%2 << 7;
 	can_pkgs_.gpsMsg.data[5] = lateral_err/2;

@@ -10,7 +10,8 @@
 
 PathTracking::PathTracking(const ros::NodeHandle& nh, const ros::NodeHandle& nh_private):
 	nh_(nh),
-    nh_private_(nh_private)
+    nh_private_(nh_private),
+	lat_error_buffer_(20)
 {
 	is_running_ = false;
 	lateral_err_ = 0.0;
@@ -169,6 +170,7 @@ bool PathTracking::update(float speed, float road_wheelangle,  //vehicle state
 
 	lateral_err_ = calculateDis2path2(vehicle_point.x, vehicle_point.y, path_, nearest_point_index_, target_point_index_,//input
 					            nearest_point_index_); //output
+	
 	lateral_err_ = lateral_err_ - path_offset; 
 
 	float yaw_err = dis_yaw.second - vehicle_point.yaw;
@@ -221,15 +223,31 @@ void PathTracking::getTrackingCmd(float& speed, float& roadWheelAngle)
 	roadWheelAngle = t_roadwheel_angle_;
 }
 
-
 void PathTracking::publishInfo()
 {
+	lat_error_buffer_.push_back(lateral_err_);
+	float sum = std::accumulate(lat_error_buffer_.begin(), lat_error_buffer_.end(), 0);
+	float lat_err = sum/lat_error_buffer_.size();
+
 	info_.nearest_point_index = nearest_point_index_;
 	info_.target_point_index = target_point_index_;
 	info_.speed = vehicle_speed_;
-	info_.lateral_err = lateral_err_/3.0;
+	info_.lateral_err = lat_err/3.0;   //lateral_err_
 	info_.latitude = current_pos_.latitude;
 	info_.longitude = current_pos_.longitude;
 
 	pub_info_.publish(info_);
+}
+
+bool PathTracking::setLogFile(const std::string& str)
+{
+	log_file_name_ = str;
+	log_fd_.open(log_file_name_.c_str());
+	if(!log_fd_.is_open())
+	{
+
+		ROS_ERROR("[%s] open log file %s failed.", __NAME__, str.c_str());
+		return false;
+	}
+	return true;
 }
